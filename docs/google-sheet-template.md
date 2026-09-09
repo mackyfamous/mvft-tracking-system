@@ -18,6 +18,8 @@ Ticket ID	Created At	Updated At	Created By	Created By Email	Title	Description	Pr
 
 `Created By` should be the requester or creator name. `Created By Email` is used for update notifications when the ticket changes.
 
+When adding a task from the menu, the `Created by` dropdown is preselected from the current Google user when Apps Script can read the user's email. When a ticket is created by typing directly into the sheet, blank creator fields are filled from the editor email when Google makes it available.
+
 Recommended dropdown values:
 
 Priority:

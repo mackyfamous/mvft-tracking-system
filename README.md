@@ -8,7 +8,7 @@ Google Sheets ticket and task tracker with Apps Script email notifications.
 - Auto-generated ticket IDs such as `MVFT-0001`
 - Dropdowns for priority, status, and assignee
 - Email notification when a ticket is assigned
-- Creator tracking with `Created By` and `Created By Email`
+- Creator tracking with `Created By` and `Created By Email`, prefilled from the current Google user when available
 - Email notification to the creator when an existing ticket is updated
 - Duplicate-send protection using the last notified assignee email
 - Grouped menu actions for tasks, members, and settings inside Google Sheets
@@ -54,6 +54,8 @@ When a row has a ticket title and assignee email, the assigned person receives a
 
 When an existing ticket changes, the person in `Created By Email` receives an update email with the changed fields.
 
+The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. The script looks up the matching name in `Assignees`; if no member matches, it derives a readable name from the email address.
+
 ## Google Sheets Menu
 
 The script adds a `MVFT Tracker` menu with these groups:
@@ -69,3 +71,5 @@ The add and update actions open one form dialog with all fields, then save with 
 Google requires the account that owns/runs the Apps Script to authorize email sending. The first time `installTriggers` or `sendPendingAssignmentNotifications` is run, Google will ask for permissions.
 
 The sender will be the Google account that authorized the script.
+
+Google may hide the editor email for some consumer accounts, shared files, or domain settings. In that case, the form still requires the creator name and email before saving.

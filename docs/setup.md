@@ -101,7 +101,7 @@ Created By
 Created By Email
 ```
 
-The script will fill in ticket metadata and send the assignment notification email.
+The script will fill in ticket metadata and send the assignment notification email. If `Created By` and `Created By Email` are blank on a direct sheet edit, the edit trigger fills them from the editor's Google email when Google makes that email available.
 
 You can also use:
 
@@ -109,7 +109,7 @@ You can also use:
 MVFT Tracker > Task > Add task
 ```
 
-The menu version opens one form dialog for the creator, task details, assignee, due date, and notes.
+The menu version opens one form dialog for the creator, task details, assignee, due date, and notes. The `Created by` dropdown is preselected with the current Google user when possible. The name comes from the `Assignees` tab when the email matches a member; otherwise, the script derives a readable name from the email address.
 
 ## Update Tickets
 
@@ -121,7 +121,7 @@ MVFT Tracker > Task > Update selected task
 
 This opens one form dialog with the selected task prefilled. The creator listed in `Created By Email` receives an update email when meaningful fields change, such as title, description, priority, status, assignee, due date, or notes.
 
-If editing directly in the sheet, make sure `Created By Email` is filled so creator update notifications can send.
+If editing directly in the sheet and Google does not expose the editor email, make sure `Created By Email` is filled so creator update notifications can send.
 
 ## Manual Notification Run
 

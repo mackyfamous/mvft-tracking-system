@@ -169,13 +169,14 @@ function handleTicketEdit(e) {
   lock.waitLock(30000);
 
   try {
+    const editorEmail = getEditActorEmail_(e);
     for (let row = Math.max(firstRow, 2); row <= lastRow; row += 1) {
       const previousTicket = getStoredTicketSnapshotForRow_(sheet, row);
-      normalizeTicketRow_(sheet, row);
+      normalizeTicketRow_(sheet, row, editorEmail);
       maybeHydrateMemberEmails_(sheet, row);
       maybeSendAssignmentEmail_(sheet, row);
       const currentTicket = mapTicketRow_(getTicketRow_(sheet, row));
-      maybeSendCreatorUpdateEmail_(sheet, row, previousTicket, currentTicket, getEditActorEmail_(e));
+      maybeSendCreatorUpdateEmail_(sheet, row, previousTicket, currentTicket, editorEmail);
       saveTicketSnapshot_(currentTicket);
     }
   } finally {
@@ -235,8 +236,9 @@ function updateSetting() {
 function showTaskDialog_(mode) {
   const { ticketsSheet, assigneesSheet } = ensureTrackerReady_();
   const activeRange = SpreadsheetApp.getActiveRange();
+  const currentUser = getCurrentUserProfile_(assigneesSheet);
   let rowNumber = '';
-  let ticket = defaultTaskDialogTicket_();
+  let ticket = defaultTaskDialogTicket_(currentUser);
 
   if (mode === 'update') {
     if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.tickets || activeRange.getRow() <= 1) {
@@ -261,13 +263,14 @@ function showTaskDialog_(mode) {
     priorities: CONFIG.priorities,
     statuses: CONFIG.statuses,
     members: getMembers_(assigneesSheet),
+    currentUser,
   });
 }
 
 function submitTaskForm(form) {
   const { ticketsSheet, assigneesSheet } = ensureTrackerReady_();
   const mode = normalizeMode_(form.mode, ['add', 'update']);
-  const task = normalizeTaskForm_(form, assigneesSheet);
+  const task = normalizeTaskForm_(form, assigneesSheet, getCurrentUserProfile_(assigneesSheet));
 
   if (mode === 'add') {
     const now = new Date();
@@ -428,13 +431,17 @@ function submitSettingForm(form) {
   return { message: `Setting "${settingName}" was updated.` };
 }
 
-function normalizeTicketRow_(sheet, rowNumber) {
+function normalizeTicketRow_(sheet, rowNumber, editorEmail) {
   const row = getTicketRow_(sheet, rowNumber);
   if (isBlankTicketRow_(row)) {
     return;
   }
 
   const now = new Date();
+  const createdBy = String(row[COL.CREATED_BY - 1] || '').trim();
+  const createdByEmail = String(row[COL.CREATED_BY_EMAIL - 1] || '').trim();
+  const shouldFillCreatorName = !createdBy && (createdByEmail || editorEmail);
+  const shouldFillCreatorEmail = !createdBy && !createdByEmail && editorEmail;
 
   if (!row[COL.TICKET_ID - 1]) {
     sheet.getRange(rowNumber, COL.TICKET_ID).setValue(nextTicketId_());
@@ -442,6 +449,19 @@ function normalizeTicketRow_(sheet, rowNumber) {
 
   if (!row[COL.CREATED_AT - 1]) {
     sheet.getRange(rowNumber, COL.CREATED_AT).setValue(now);
+  }
+
+  if (shouldFillCreatorName || shouldFillCreatorEmail) {
+    const assigneesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheets.assignees);
+    const currentUser = getCurrentUserProfile_(assigneesSheet, createdByEmail || editorEmail);
+
+    if (shouldFillCreatorName && currentUser.name) {
+      sheet.getRange(rowNumber, COL.CREATED_BY).setValue(currentUser.name);
+    }
+
+    if (shouldFillCreatorEmail && currentUser.email) {
+      sheet.getRange(rowNumber, COL.CREATED_BY_EMAIL).setValue(currentUser.email);
+    }
   }
 
   sheet.getRange(rowNumber, COL.UPDATED_AT).setValue(now);
@@ -747,11 +767,13 @@ function showDialog_(templateName, title, data) {
   SpreadsheetApp.getUi().showModalDialog(html, title);
 }
 
-function defaultTaskDialogTicket_() {
+function defaultTaskDialogTicket_(currentUser) {
+  const creator = currentUser || { name: '', email: '' };
+
   return {
     ticketId: '',
-    createdBy: '',
-    createdByEmail: '',
+    createdBy: creator.name || '',
+    createdByEmail: creator.email || '',
     title: '',
     description: '',
     priority: getSetting_('Default Priority', CONFIG.defaultPriority),
@@ -779,13 +801,22 @@ function serializeTicketForDialog_(ticket) {
   };
 }
 
-function normalizeTaskForm_(form, assigneesSheet) {
-  const createdBy = hydrateMemberFromForm_(assigneesSheet, form.createdBy, form.createdByEmail, {
-    nameLabel: 'Created by',
-    emailLabel: 'Created by email',
-    requireName: true,
-    requireEmail: true,
-  });
+function normalizeTaskForm_(form, assigneesSheet, currentUser) {
+  const creator = currentUser || { name: '', email: '' };
+  const formCreatedBy = String(form.createdBy || '').trim();
+  const formCreatedByEmail = String(form.createdByEmail || '').trim();
+  const useCurrentUser = !formCreatedBy && !formCreatedByEmail;
+  const createdBy = hydrateMemberFromForm_(
+    assigneesSheet,
+    useCurrentUser ? creator.name : formCreatedBy,
+    useCurrentUser ? creator.email : formCreatedByEmail,
+    {
+      nameLabel: 'Created by',
+      emailLabel: 'Created by email',
+      requireName: true,
+      requireEmail: true,
+    }
+  );
   const assignee = hydrateMemberFromForm_(assigneesSheet, form.assignee, form.assigneeEmail, {
     nameLabel: 'Assignee',
     emailLabel: 'Assignee email',
@@ -926,6 +957,11 @@ function findMemberByEmail_(assigneesSheet, email) {
   return getMembers_(assigneesSheet).find((member) => normalizeLookupValue_(member.email) === normalizedEmail) || null;
 }
 
+function findAnyMemberByEmail_(assigneesSheet, email) {
+  const normalizedEmail = normalizeLookupValue_(email);
+  return getAllMembers_(assigneesSheet).find((member) => normalizeLookupValue_(member.email) === normalizedEmail) || null;
+}
+
 function getMembers_(assigneesSheet) {
   return getAllMembers_(assigneesSheet)
     .filter((member) => member.name && normalizeLookupValue_(member.active) !== 'no');
@@ -1054,10 +1090,34 @@ function getEditActorEmail_(e) {
 
 function getActiveUserEmail_() {
   try {
-    return Session.getActiveUser().getEmail() || '';
+    return String(Session.getActiveUser().getEmail() || '').trim();
   } catch (error) {
     return '';
   }
+}
+
+function getCurrentUserProfile_(assigneesSheet, emailOverride) {
+  const email = String(emailOverride || getActiveUserEmail_() || '').trim();
+  if (!email) {
+    return { name: '', email: '' };
+  }
+
+  const member = assigneesSheet ? findAnyMemberByEmail_(assigneesSheet, email) : null;
+  return {
+    name: member && member.name ? member.name : inferNameFromEmail_(email),
+    email,
+  };
+}
+
+function inferNameFromEmail_(email) {
+  const localPart = String(email || '').split('@')[0];
+  const name = localPart
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+
+  return name || email;
 }
 
 function isSettingEnabled_(key, fallback) {

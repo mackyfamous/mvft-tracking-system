@@ -119,7 +119,7 @@
       <div class="grid">
         <label>
           Created by
-          <input name="createdBy" list="members" autocomplete="off" required>
+          <select name="createdBy" required></select>
         </label>
         <label>
           Created by email
@@ -179,10 +179,36 @@
 
     <script>
       const DATA = <?!= data ?>;
-      const members = DATA.members || [];
+      const currentUser = DATA.currentUser || {};
+      const members = mergeMembers(DATA.members || [], currentUser);
 
       function normalize(value) {
         return String(value || '').trim().toLowerCase();
+      }
+
+      function mergeMembers(memberList, user) {
+        const merged = [];
+        const seen = {};
+
+        function addMember(member) {
+          const name = String(member.name || '').trim();
+          const email = String(member.email || '').trim();
+          const key = normalize(email) || normalize(name);
+          if ((!name && !email) || seen[key]) {
+            return;
+          }
+
+          seen[key] = true;
+          merged.push({
+            name: name || email,
+            email,
+          });
+        }
+
+        addMember(user || {});
+        memberList.forEach(addMember);
+
+        return merged;
       }
 
       function findMemberByName(name) {
@@ -207,6 +233,50 @@
         });
       }
 
+      function fillMemberSelect(name, selectedName, selectedEmail) {
+        const select = document.querySelector(`[name="${name}"]`);
+        const hasSelection = Boolean(normalize(selectedName) || normalize(selectedEmail));
+        const options = mergeMembers(
+          [
+            {
+              name: selectedName,
+              email: selectedEmail,
+            },
+            ...members,
+          ],
+          {}
+        );
+
+        select.innerHTML = '';
+
+        if (!hasSelection) {
+          const placeholder = document.createElement('option');
+          placeholder.value = '';
+          placeholder.textContent = 'Select creator';
+          placeholder.disabled = true;
+          placeholder.selected = true;
+          select.appendChild(placeholder);
+        }
+
+        if (options.length === 0) {
+          return;
+        }
+
+        options.forEach((member) => {
+          const option = document.createElement('option');
+          option.value = member.name;
+          option.textContent = member.email ? `${member.name} (${member.email})` : member.name;
+          option.dataset.email = member.email || '';
+          if (
+            (selectedName && normalize(member.name) === normalize(selectedName)) ||
+            (selectedEmail && normalize(member.email) === normalize(selectedEmail))
+          ) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      }
+
       function fillMembers() {
         const datalist = document.getElementById('members');
         datalist.innerHTML = '';
@@ -221,6 +291,14 @@
       function hydrateEmail(nameField, emailField) {
         const nameInput = document.querySelector(`[name="${nameField}"]`);
         const emailInput = document.querySelector(`[name="${emailField}"]`);
+        if (nameInput.tagName === 'SELECT') {
+          const selectedOption = nameInput.options[nameInput.selectedIndex];
+          if (selectedOption && selectedOption.dataset.email) {
+            emailInput.value = selectedOption.dataset.email;
+            return;
+          }
+        }
+
         const member = findMemberByName(nameInput.value);
         if (member && member.email) {
           emailInput.value = member.email;
@@ -277,10 +355,10 @@
         }
 
         fillMembers();
+        fillMemberSelect('createdBy', ticket.createdBy, ticket.createdByEmail);
         fillSelect('priority', DATA.priorities || [], ticket.priority);
         fillSelect('status', DATA.statuses || [], ticket.status);
 
-        setField('createdBy', ticket.createdBy);
         setField('createdByEmail', ticket.createdByEmail);
         setField('title', ticket.title);
         setField('description', ticket.description);
@@ -292,6 +370,8 @@
         document.querySelector('[name="createdBy"]').addEventListener('change', () => {
           hydrateEmail('createdBy', 'createdByEmail');
         });
+        hydrateEmail('createdBy', 'createdByEmail');
+
         document.querySelector('[name="assignee"]').addEventListener('change', () => {
           hydrateEmail('assignee', 'assigneeEmail');
         });
