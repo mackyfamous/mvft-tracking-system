@@ -13,8 +13,10 @@ Tickets
 Use this header row:
 
 ```text
-Ticket ID	Created At	Updated At	Title	Description	Priority	Status	Assignee	Assignee Email	Due Date	Notification Status	Notified Email	Notified At	Notes
+Ticket ID	Created At	Updated At	Created By	Created By Email	Title	Description	Priority	Status	Assignee	Assignee Email	Due Date	Assignment Notification Status	Assignment Notified Email	Assignment Notified At	Update Notification Status	Update Notified At	Notes
 ```
+
+`Created By` should be the requester or creator name. `Created By Email` is used for update notifications when the ticket changes.
 
 Recommended dropdown values:
 
@@ -74,5 +76,6 @@ Tracker Name	MVFT Tracking System
 Notification Prefix	[MVFT]
 Default Priority	Medium
 Default Status	Open
+Enable Assignment Emails	Yes
+Enable Creator Update Emails	Yes
 ```
-

@@ -8,8 +8,10 @@ Google Sheets ticket and task tracker with Apps Script email notifications.
 - Auto-generated ticket IDs such as `MVFT-0001`
 - Dropdowns for priority, status, and assignee
 - Email notification when a ticket is assigned
+- Creator tracking with `Created By` and `Created By Email`
+- Email notification to the creator when an existing ticket is updated
 - Duplicate-send protection using the last notified assignee email
-- Manual menu actions inside Google Sheets
+- Grouped menu actions for tasks, members, and settings inside Google Sheets
 
 ## Repository Structure
 
@@ -46,9 +48,18 @@ The script creates and manages three tabs:
 
 When a row has a ticket title and assignee email, the assigned person receives an email.
 
+When an existing ticket changes, the person in `Created By Email` receives an update email with the changed fields.
+
+## Google Sheets Menu
+
+The script adds a `MVFT Tracker` menu with these groups:
+
+- `Task`: add a task, update the selected task, and send pending assignment emails
+- `Member`: add a member and update the selected member
+- `Settings`: run setup, update a setting, and install the email trigger
+
 ## Important Note About Email Permissions
 
 Google requires the account that owns/runs the Apps Script to authorize email sending. The first time `installTriggers` or `sendPendingAssignmentNotifications` is run, Google will ask for permissions.
 
 The sender will be the Google account that authorized the script.
-
