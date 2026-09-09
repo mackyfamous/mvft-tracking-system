@@ -137,6 +137,10 @@ This sends assignment emails for tickets that have not yet notified their curren
 
 If the assignee email changes, the script sends a new notification to the new email address. It will not resend to the same email unless the `Assignment Notified Email` value is cleared or changed.
 
+## Troubleshooting
+
+If saving a task says a title or other field violates a priority/status validation rule, paste the latest `Code.gs`, save the Apps Script project, and run `setupTracker` once. This clears old validations from earlier tracker versions and reapplies them to the current columns.
+
 ## Settings
 
 Use the `Settings` tab or this menu item to update defaults:

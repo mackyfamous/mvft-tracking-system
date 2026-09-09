@@ -1212,6 +1212,8 @@ function applyValidations_(ticketsSheet, assigneesSheet) {
     return;
   }
 
+  ticketsSheet.getRange(2, 1, maxRows - 1, TICKET_HEADERS.length).clearDataValidations();
+
   const priorityRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(CONFIG.priorities, true)
     .setAllowInvalid(false)
