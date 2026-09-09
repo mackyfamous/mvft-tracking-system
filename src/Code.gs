@@ -12,7 +12,6 @@ const CONFIG = {
   defaultPriority: 'Medium',
   defaultStatus: 'Open',
   ticketPrefix: 'MVFT',
-  clearToken: 'CLEAR',
 };
 
 const TICKET_HEADERS = [
@@ -214,162 +213,111 @@ function sendPendingAssignmentNotifications() {
 }
 
 function addTask() {
-  const { ticketsSheet, assigneesSheet } = ensureTrackerReady_();
-  const title = 'Add Task';
-
-  const createdBy = promptMember_(assigneesSheet, title, 'Created by', {
-    requireName: true,
-    requireEmail: true,
-  });
-  if (!createdBy) {
-    return;
-  }
-
-  const taskTitle = promptRequired_(title, 'Task title');
-  if (taskTitle === null) {
-    return;
-  }
-
-  const description = promptOptional_(title, 'Description');
-  if (description === null) {
-    return;
-  }
-
-  const priority = promptChoice_(title, 'Priority', CONFIG.priorities, getSetting_('Default Priority', CONFIG.defaultPriority));
-  if (priority === null) {
-    return;
-  }
-
-  const status = promptChoice_(title, 'Status', CONFIG.statuses, getSetting_('Default Status', CONFIG.defaultStatus));
-  if (status === null) {
-    return;
-  }
-
-  const assignee = promptMember_(assigneesSheet, title, 'Assignee', {
-    requireName: false,
-    requireEmail: true,
-  });
-  if (!assignee) {
-    return;
-  }
-
-  const dueDate = promptDate_(title, 'Due date in YYYY-MM-DD format. Leave blank if there is no due date.', {
-    allowBlank: true,
-  });
-  if (dueDate === null) {
-    return;
-  }
-
-  const notes = promptOptional_(title, 'Notes');
-  if (notes === null) {
-    return;
-  }
-
-  const now = new Date();
-  const rowNumber = ticketsSheet.getLastRow() + 1;
-  const ticketId = nextTicketId_();
-  const row = emptyTicketRow_();
-
-  row[COL.TICKET_ID - 1] = ticketId;
-  row[COL.CREATED_AT - 1] = now;
-  row[COL.UPDATED_AT - 1] = now;
-  row[COL.CREATED_BY - 1] = createdBy.name;
-  row[COL.CREATED_BY_EMAIL - 1] = createdBy.email;
-  row[COL.TITLE - 1] = taskTitle;
-  row[COL.DESCRIPTION - 1] = description;
-  row[COL.PRIORITY - 1] = priority;
-  row[COL.STATUS - 1] = status;
-  row[COL.ASSIGNEE - 1] = assignee.name;
-  row[COL.ASSIGNEE_EMAIL - 1] = assignee.email;
-  row[COL.DUE_DATE - 1] = dueDate || '';
-  row[COL.NOTES - 1] = notes;
-
-  ticketsSheet.getRange(rowNumber, 1, 1, TICKET_HEADERS.length).setValues([row]);
-  maybeSendAssignmentEmail_(ticketsSheet, rowNumber);
-  saveTicketSnapshot_(mapTicketRow_(getTicketRow_(ticketsSheet, rowNumber)));
-  ticketsSheet.setActiveRange(ticketsSheet.getRange(rowNumber, COL.TITLE));
-
-  alertUser_(`Task ${ticketId} was created.`);
+  showTaskDialog_('add');
 }
 
 function updateSelectedTask() {
+  showTaskDialog_('update');
+}
+
+function addMember() {
+  showMemberDialog_('add');
+}
+
+function updateSelectedMember() {
+  showMemberDialog_('update');
+}
+
+function updateSetting() {
+  showSettingDialog_();
+}
+
+function showTaskDialog_(mode) {
   const { ticketsSheet, assigneesSheet } = ensureTrackerReady_();
   const activeRange = SpreadsheetApp.getActiveRange();
+  let rowNumber = '';
+  let ticket = defaultTaskDialogTicket_();
 
-  if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.tickets || activeRange.getRow() <= 1) {
-    alertUser_('Select a task row in the Tickets tab before using Update selected task.');
-    return;
+  if (mode === 'update') {
+    if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.tickets || activeRange.getRow() <= 1) {
+      alertUser_('Select a task row in the Tickets tab before using Update selected task.');
+      return;
+    }
+
+    rowNumber = activeRange.getRow();
+    const row = getTicketRow_(ticketsSheet, rowNumber);
+    if (isBlankTicketRow_(row)) {
+      alertUser_('The selected ticket row is blank.');
+      return;
+    }
+
+    ticket = serializeTicketForDialog_(mapTicketRow_(row));
   }
 
-  const rowNumber = activeRange.getRow();
+  showDialog_('TaskDialog', mode === 'add' ? 'Add Task' : 'Update Task', {
+    mode,
+    rowNumber,
+    ticket,
+    priorities: CONFIG.priorities,
+    statuses: CONFIG.statuses,
+    members: getMembers_(assigneesSheet),
+  });
+}
+
+function submitTaskForm(form) {
+  const { ticketsSheet, assigneesSheet } = ensureTrackerReady_();
+  const mode = normalizeMode_(form.mode, ['add', 'update']);
+  const task = normalizeTaskForm_(form, assigneesSheet);
+
+  if (mode === 'add') {
+    const now = new Date();
+    const rowNumber = ticketsSheet.getLastRow() + 1;
+    const ticketId = nextTicketId_();
+    const row = emptyTicketRow_();
+
+    row[COL.TICKET_ID - 1] = ticketId;
+    row[COL.CREATED_AT - 1] = now;
+    row[COL.UPDATED_AT - 1] = now;
+    row[COL.CREATED_BY - 1] = task.createdBy;
+    row[COL.CREATED_BY_EMAIL - 1] = task.createdByEmail;
+    row[COL.TITLE - 1] = task.title;
+    row[COL.DESCRIPTION - 1] = task.description;
+    row[COL.PRIORITY - 1] = task.priority;
+    row[COL.STATUS - 1] = task.status;
+    row[COL.ASSIGNEE - 1] = task.assignee;
+    row[COL.ASSIGNEE_EMAIL - 1] = task.assigneeEmail;
+    row[COL.DUE_DATE - 1] = task.dueDate || '';
+    row[COL.NOTES - 1] = task.notes;
+
+    ticketsSheet.getRange(rowNumber, 1, 1, TICKET_HEADERS.length).setValues([row]);
+    maybeSendAssignmentEmail_(ticketsSheet, rowNumber);
+    saveTicketSnapshot_(mapTicketRow_(getTicketRow_(ticketsSheet, rowNumber)));
+    ticketsSheet.setActiveRange(ticketsSheet.getRange(rowNumber, COL.TITLE));
+
+    return { message: `Task ${ticketId} was created.` };
+  }
+
+  const rowNumber = Number(form.rowNumber);
+  if (!Number.isInteger(rowNumber) || rowNumber <= 1 || rowNumber > ticketsSheet.getLastRow()) {
+    throw new Error('Select a valid task row before updating.');
+  }
+
   const previousTicket = mapTicketRow_(getTicketRow_(ticketsSheet, rowNumber));
   if (isBlankTicketRow_(getTicketRow_(ticketsSheet, rowNumber))) {
-    alertUser_('The selected ticket row is blank.');
-    return;
+    throw new Error('The selected ticket row is blank.');
   }
 
-  const title = 'Update Selected Task';
   const row = getTicketRow_(ticketsSheet, rowNumber);
-
-  const taskTitle = promptUpdateText_(title, 'Title', previousTicket.title);
-  if (taskTitle === null) {
-    return;
-  }
-
-  const description = promptUpdateText_(title, 'Description', previousTicket.description);
-  if (description === null) {
-    return;
-  }
-
-  const priority = promptUpdateChoice_(title, 'Priority', CONFIG.priorities, previousTicket.priority);
-  if (priority === null) {
-    return;
-  }
-
-  const status = promptUpdateChoice_(title, 'Status', CONFIG.statuses, previousTicket.status);
-  if (status === null) {
-    return;
-  }
-
-  const assignee = promptUpdateText_(title, 'Assignee', previousTicket.assignee);
-  if (assignee === null) {
-    return;
-  }
-
-  let assigneeEmail = promptUpdateEmail_(title, 'Assignee email', previousTicket.assigneeEmail);
-  if (assigneeEmail === null) {
-    return;
-  }
-
-  const dueDate = promptUpdateDate_(title, 'Due date', previousTicket.dueDate);
-  if (dueDate === null) {
-    return;
-  }
-
-  const notes = promptUpdateText_(title, 'Notes', previousTicket.notes);
-  if (notes === null) {
-    return;
-  }
-
-  row[COL.TITLE - 1] = taskTitle;
-  row[COL.DESCRIPTION - 1] = description;
-  row[COL.PRIORITY - 1] = priority;
-  row[COL.STATUS - 1] = status;
-  row[COL.ASSIGNEE - 1] = assignee;
-
-  if (
-    normalizeLookupValue_(assignee) !== normalizeLookupValue_(previousTicket.assignee) &&
-    normalizeLookupValue_(assigneeEmail) === normalizeLookupValue_(previousTicket.assigneeEmail)
-  ) {
-    const assigneeMember = findMemberByName_(assigneesSheet, assignee);
-    if (assigneeMember && assigneeMember.email) {
-      assigneeEmail = assigneeMember.email;
-    }
-  }
-
-  row[COL.ASSIGNEE_EMAIL - 1] = assigneeEmail;
-  row[COL.DUE_DATE - 1] = dueDate || '';
-  row[COL.NOTES - 1] = notes;
+  row[COL.CREATED_BY - 1] = task.createdBy;
+  row[COL.CREATED_BY_EMAIL - 1] = task.createdByEmail;
+  row[COL.TITLE - 1] = task.title;
+  row[COL.DESCRIPTION - 1] = task.description;
+  row[COL.PRIORITY - 1] = task.priority;
+  row[COL.STATUS - 1] = task.status;
+  row[COL.ASSIGNEE - 1] = task.assignee;
+  row[COL.ASSIGNEE_EMAIL - 1] = task.assigneeEmail;
+  row[COL.DUE_DATE - 1] = task.dueDate || '';
+  row[COL.NOTES - 1] = task.notes;
 
   ticketsSheet.getRange(rowNumber, 1, 1, TICKET_HEADERS.length).setValues([row]);
   normalizeTicketRow_(ticketsSheet, rowNumber);
@@ -380,103 +328,104 @@ function updateSelectedTask() {
   maybeSendCreatorUpdateEmail_(ticketsSheet, rowNumber, snapshotTicket_(previousTicket), currentTicket, getActiveUserEmail_());
   saveTicketSnapshot_(currentTicket);
 
-  alertUser_(`Task ${currentTicket.ticketId || rowNumber} was updated.`);
+  return { message: `Task ${currentTicket.ticketId || rowNumber} was updated.` };
 }
 
-function addMember() {
-  const { assigneesSheet, ticketsSheet } = ensureTrackerReady_();
-  const title = 'Add Member';
-
-  const name = promptRequired_(title, 'Member name');
-  if (name === null) {
-    return;
-  }
-
-  const email = promptEmail_(title, 'Member email', { required: true });
-  if (email === null) {
-    return;
-  }
-
-  if (findMemberByEmail_(assigneesSheet, email)) {
-    alertUser_('That email already exists in the Assignees tab. Use Update selected member instead.');
-    return;
-  }
-
-  const active = promptChoice_(title, 'Active', CONFIG.activeOptions, 'Yes');
-  if (active === null) {
-    return;
-  }
-
-  const rowNumber = assigneesSheet.getLastRow() + 1;
-  assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).setValues([[name, email, active]]);
-  applyValidations_(ticketsSheet, assigneesSheet);
-  assigneesSheet.setActiveRange(assigneesSheet.getRange(rowNumber, 1));
-
-  alertUser_(`Member ${name} was added.`);
-}
-
-function updateSelectedMember() {
-  const { assigneesSheet, ticketsSheet } = ensureTrackerReady_();
+function showMemberDialog_(mode) {
+  const { assigneesSheet } = ensureTrackerReady_();
   const activeRange = SpreadsheetApp.getActiveRange();
+  let rowNumber = '';
+  let member = { name: '', email: '', active: 'Yes' };
 
-  if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.assignees || activeRange.getRow() <= 1) {
-    alertUser_('Select a member row in the Assignees tab before using Update selected member.');
-    return;
-  }
-
-  const rowNumber = activeRange.getRow();
-  const current = assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).getValues()[0];
-  const title = 'Update Selected Member';
-
-  const name = promptUpdateText_(title, 'Name', current[0]);
-  if (name === null) {
-    return;
-  }
-
-  const email = promptUpdateEmail_(title, 'Email', current[1]);
-  if (email === null) {
-    return;
-  }
-
-  const active = promptUpdateChoice_(title, 'Active', CONFIG.activeOptions, current[2] || 'Yes');
-  if (active === null) {
-    return;
-  }
-
-  assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).setValues([[name, email, active]]);
-  applyValidations_(ticketsSheet, assigneesSheet);
-
-  alertUser_(`Member ${name} was updated.`);
-}
-
-function updateSetting() {
-  const { settingsSheet } = ensureTrackerReady_();
-  const activeRange = SpreadsheetApp.getActiveRange();
-  const title = 'Update Setting';
-  let settingName = '';
-  let currentValue = '';
-
-  if (activeRange && activeRange.getSheet().getName() === CONFIG.sheets.settings && activeRange.getRow() > 1) {
-    const row = settingsSheet.getRange(activeRange.getRow(), 1, 1, SETTINGS_HEADERS.length).getValues()[0];
-    settingName = String(row[0] || '').trim();
-    currentValue = row[1];
-  }
-
-  if (!settingName) {
-    settingName = promptRequired_(title, `Setting name. Common options: ${DEFAULT_SETTINGS.map((row) => row[0]).join(', ')}`);
-    if (settingName === null) {
+  if (mode === 'update') {
+    if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.assignees || activeRange.getRow() <= 1) {
+      alertUser_('Select a member row in the Assignees tab before using Update selected member.');
       return;
     }
-    currentValue = getSetting_(settingName, '');
+
+    rowNumber = activeRange.getRow();
+    const row = assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).getValues()[0];
+    member = {
+      name: String(row[0] || '').trim(),
+      email: String(row[1] || '').trim(),
+      active: String(row[2] || 'Yes').trim(),
+    };
+
+    if (!member.name && !member.email) {
+      alertUser_('The selected member row is blank.');
+      return;
+    }
   }
 
-  const newValue = promptUpdateText_(title, `Value for ${settingName}`, currentValue);
-  if (newValue === null) {
-    return;
+  showDialog_('MemberDialog', mode === 'add' ? 'Add Member' : 'Update Member', {
+    mode,
+    rowNumber,
+    member,
+    activeOptions: CONFIG.activeOptions,
+  });
+}
+
+function submitMemberForm(form) {
+  const { assigneesSheet, ticketsSheet } = ensureTrackerReady_();
+  const mode = normalizeMode_(form.mode, ['add', 'update']);
+  const name = requireString_(form.name, 'Member name');
+  const email = requireEmail_(form.email, 'Member email');
+  const active = requireChoice_(form.active || 'Yes', CONFIG.activeOptions, 'Active');
+  const rowNumber = mode === 'update' ? Number(form.rowNumber) : null;
+  const duplicate = getAllMembers_(assigneesSheet).find(
+    (member) => normalizeLookupValue_(member.email) === normalizeLookupValue_(email) && member.rowNumber !== rowNumber
+  );
+
+  if (duplicate) {
+    throw new Error('That email already exists in the Assignees tab.');
   }
 
-  setSettingValue_(settingsSheet, settingName, newValue);
-  alertUser_(`Setting "${settingName}" was updated.`);
+  if (mode === 'update') {
+    if (!Number.isInteger(rowNumber) || rowNumber <= 1 || rowNumber > assigneesSheet.getLastRow()) {
+      throw new Error('Select a valid member row before updating.');
+    }
+
+    assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).setValues([[name, email, active]]);
+    applyValidations_(ticketsSheet, assigneesSheet);
+    return { message: `Member ${name} was updated.` };
+  }
+
+  const newRowNumber = assigneesSheet.getLastRow() + 1;
+  assigneesSheet.getRange(newRowNumber, 1, 1, ASSIGNEE_HEADERS.length).setValues([[name, email, active]]);
+  applyValidations_(ticketsSheet, assigneesSheet);
+  assigneesSheet.setActiveRange(assigneesSheet.getRange(newRowNumber, 1));
+
+  return { message: `Member ${name} was added.` };
+}
+
+function showSettingDialog_() {
+  const { settingsSheet } = ensureTrackerReady_();
+  const activeRange = SpreadsheetApp.getActiveRange();
+  let selectedSetting = '';
+
+  if (activeRange && activeRange.getSheet().getName() === CONFIG.sheets.settings && activeRange.getRow() > 1) {
+    selectedSetting = String(settingsSheet.getRange(activeRange.getRow(), 1).getValue() || '').trim();
+  }
+
+  showDialog_('SettingDialog', 'Update Setting', {
+    selectedSetting,
+    settings: getSettingsForDialog_(settingsSheet),
+    defaultSettingNames: DEFAULT_SETTINGS.map((row) => row[0]),
+  });
+}
+
+function submitSettingForm(form) {
+  const { settingsSheet } = ensureTrackerReady_();
+  const selectedSettingName = String(form.settingName || '').trim();
+  const settingName =
+    selectedSettingName === '__custom__'
+      ? requireString_(form.customSettingName, 'Custom setting name')
+      : requireString_(selectedSettingName, 'Setting name');
+  const value = String(form.value || '').trim();
+
+  setSettingValue_(settingsSheet, settingName, value);
+
+  return { message: `Setting "${settingName}" was updated.` };
 }
 
 function normalizeTicketRow_(sheet, rowNumber) {
@@ -786,256 +735,162 @@ function emptyTicketRow_() {
   return Array(TICKET_HEADERS.length).fill('');
 }
 
-function promptRequired_(title, message) {
-  const ui = SpreadsheetApp.getUi();
+function showDialog_(templateName, title, data) {
+  const template = HtmlService.createTemplateFromFile(templateName);
+  template.data = JSON.stringify(data);
 
-  while (true) {
-    const response = ui.prompt(title, message, ui.ButtonSet.OK_CANCEL);
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
+  const html = template
+    .evaluate()
+    .setWidth(760)
+    .setHeight(720);
 
-    const value = String(response.getResponseText() || '').trim();
-    if (value) {
-      return value;
-    }
-
-    ui.alert('This field is required.');
-  }
+  SpreadsheetApp.getUi().showModalDialog(html, title);
 }
 
-function promptOptional_(title, message) {
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt(title, `${message}. Leave blank if not needed.`, ui.ButtonSet.OK_CANCEL);
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    return null;
-  }
-
-  return String(response.getResponseText() || '').trim();
+function defaultTaskDialogTicket_() {
+  return {
+    ticketId: '',
+    createdBy: '',
+    createdByEmail: '',
+    title: '',
+    description: '',
+    priority: getSetting_('Default Priority', CONFIG.defaultPriority),
+    status: getSetting_('Default Status', CONFIG.defaultStatus),
+    assignee: '',
+    assigneeEmail: '',
+    dueDate: '',
+    notes: '',
+  };
 }
 
-function promptChoice_(title, fieldName, options, defaultValue) {
-  const ui = SpreadsheetApp.getUi();
-  const optionsText = options.join(', ');
-
-  while (true) {
-    const response = ui.prompt(
-      title,
-      `${fieldName}. Options: ${optionsText}. Leave blank for ${defaultValue}.`,
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
-
-    const value = String(response.getResponseText() || '').trim() || defaultValue;
-    const match = options.find((option) => option.toLowerCase() === value.toLowerCase());
-    if (match) {
-      return match;
-    }
-
-    ui.alert(`Please enter one of: ${optionsText}.`);
-  }
+function serializeTicketForDialog_(ticket) {
+  return {
+    ticketId: String(ticket.ticketId || '').trim(),
+    createdBy: String(ticket.createdBy || '').trim(),
+    createdByEmail: String(ticket.createdByEmail || '').trim(),
+    title: String(ticket.title || '').trim(),
+    description: String(ticket.description || '').trim(),
+    priority: String(ticket.priority || '').trim() || getSetting_('Default Priority', CONFIG.defaultPriority),
+    status: String(ticket.status || '').trim() || getSetting_('Default Status', CONFIG.defaultStatus),
+    assignee: String(ticket.assignee || '').trim(),
+    assigneeEmail: String(ticket.assigneeEmail || '').trim(),
+    dueDate: formatDateForInput_(ticket.dueDate),
+    notes: String(ticket.notes || '').trim(),
+  };
 }
 
-function promptEmail_(title, fieldName, options) {
-  const ui = SpreadsheetApp.getUi();
-  const required = Boolean(options && options.required);
+function normalizeTaskForm_(form, assigneesSheet) {
+  const createdBy = hydrateMemberFromForm_(assigneesSheet, form.createdBy, form.createdByEmail, {
+    nameLabel: 'Created by',
+    emailLabel: 'Created by email',
+    requireName: true,
+    requireEmail: true,
+  });
+  const assignee = hydrateMemberFromForm_(assigneesSheet, form.assignee, form.assigneeEmail, {
+    nameLabel: 'Assignee',
+    emailLabel: 'Assignee email',
+    requireName: false,
+    requireEmail: true,
+  });
+  const dueDateText = String(form.dueDate || '').trim();
 
-  while (true) {
-    const response = ui.prompt(
-      title,
-      `${fieldName}${required ? '' : '. Leave blank if not needed.'}`,
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
-
-    const value = String(response.getResponseText() || '').trim();
-    if (!value && !required) {
-      return '';
-    }
-
-    if (isValidEmail_(value)) {
-      return value;
-    }
-
-    ui.alert('Enter a valid email address.');
-  }
+  return {
+    createdBy: createdBy.name,
+    createdByEmail: createdBy.email,
+    title: requireString_(form.title, 'Task title'),
+    description: String(form.description || '').trim(),
+    priority: requireChoice_(form.priority, CONFIG.priorities, 'Priority'),
+    status: requireChoice_(form.status, CONFIG.statuses, 'Status'),
+    assignee: assignee.name,
+    assigneeEmail: assignee.email,
+    dueDate: dueDateText ? requireDate_(dueDateText, 'Due date') : '',
+    notes: String(form.notes || '').trim(),
+  };
 }
 
-function promptDate_(title, message, options) {
-  const ui = SpreadsheetApp.getUi();
-  const allowBlank = Boolean(options && options.allowBlank);
-
-  while (true) {
-    const response = ui.prompt(title, message, ui.ButtonSet.OK_CANCEL);
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
-
-    const value = String(response.getResponseText() || '').trim();
-    if (!value && allowBlank) {
-      return '';
-    }
-
-    const date = parseDateInput_(value);
-    if (date) {
-      return date;
-    }
-
-    ui.alert('Enter a valid date in YYYY-MM-DD format.');
-  }
-}
-
-function promptUpdateText_(title, fieldName, currentValue) {
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt(
-    title,
-    `${fieldName}. Current: ${formatPromptValue_(currentValue)}. Leave blank to keep it, or type ${CONFIG.clearToken} to clear it.`,
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    return null;
-  }
-
-  return resolveUpdateValue_(response.getResponseText(), currentValue);
-}
-
-function promptUpdateEmail_(title, fieldName, currentValue) {
-  const ui = SpreadsheetApp.getUi();
-
-  while (true) {
-    const response = ui.prompt(
-      title,
-      `${fieldName}. Current: ${formatPromptValue_(currentValue)}. Leave blank to keep it, or type ${CONFIG.clearToken} to clear it.`,
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
-
-    const value = resolveUpdateValue_(response.getResponseText(), currentValue);
-    if (!value || isValidEmail_(value)) {
-      return value;
-    }
-
-    ui.alert('Enter a valid email address.');
-  }
-}
-
-function promptUpdateChoice_(title, fieldName, options, currentValue) {
-  const ui = SpreadsheetApp.getUi();
-  const optionsText = options.join(', ');
-
-  while (true) {
-    const response = ui.prompt(
-      title,
-      `${fieldName}. Current: ${formatPromptValue_(currentValue)}. Options: ${optionsText}. Leave blank to keep it.`,
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
-
-    const rawValue = String(response.getResponseText() || '').trim();
-    if (!rawValue) {
-      return currentValue || '';
-    }
-
-    const match = options.find((option) => option.toLowerCase() === rawValue.toLowerCase());
-    if (match) {
-      return match;
-    }
-
-    ui.alert(`Please enter one of: ${optionsText}.`);
-  }
-}
-
-function promptUpdateDate_(title, fieldName, currentValue) {
-  const ui = SpreadsheetApp.getUi();
-
-  while (true) {
-    const response = ui.prompt(
-      title,
-      `${fieldName}. Current: ${formatPromptValue_(formatDateForEmail_(currentValue))}. Leave blank to keep it, or type ${CONFIG.clearToken} to clear it.`,
-      ui.ButtonSet.OK_CANCEL
-    );
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      return null;
-    }
-
-    const rawValue = String(response.getResponseText() || '').trim();
-    if (!rawValue) {
-      return currentValue || '';
-    }
-
-    if (rawValue.toUpperCase() === CONFIG.clearToken) {
-      return '';
-    }
-
-    const date = parseDateInput_(rawValue);
-    if (date) {
-      return date;
-    }
-
-    ui.alert('Enter a valid date in YYYY-MM-DD format.');
-  }
-}
-
-function promptMember_(assigneesSheet, title, roleLabel, options) {
-  const requireName = Boolean(options && options.requireName);
-  const requireEmail = Boolean(options && options.requireEmail);
-  let name = requireName
-    ? promptRequired_(title, `${roleLabel} name`)
-    : promptOptional_(title, `${roleLabel} name`);
-
-  if (name === null) {
-    return null;
-  }
-
-  let email = '';
+function hydrateMemberFromForm_(assigneesSheet, nameValue, emailValue, options) {
+  let name = String(nameValue || '').trim();
+  let email = String(emailValue || '').trim();
   const memberByName = name ? findMemberByName_(assigneesSheet, name) : null;
+
   if (memberByName) {
     name = memberByName.name;
-    email = memberByName.email;
+    if (!email || !isValidEmail_(email)) {
+      email = memberByName.email;
+    }
   }
 
-  if (email && requireEmail && !isValidEmail_(email)) {
-    email = '';
+  const memberByEmail = email ? findMemberByEmail_(assigneesSheet, email) : null;
+  if (memberByEmail && !name) {
+    name = memberByEmail.name;
   }
 
-  if (!email && requireEmail) {
-    email = promptEmail_(title, `${roleLabel} email`, { required: true });
-    if (email === null) {
-      return null;
-    }
+  if (options.requireName) {
+    name = requireString_(name, options.nameLabel);
+  }
 
-    const memberByEmail = findMemberByEmail_(assigneesSheet, email);
-    if (memberByEmail && !name) {
-      name = memberByEmail.name;
-    }
+  if (options.requireEmail) {
+    email = requireEmail_(email, options.emailLabel);
   }
 
   return { name, email };
 }
 
-function resolveUpdateValue_(value, currentValue) {
-  const nextValue = String(value || '').trim();
-  if (!nextValue) {
-    return currentValue || '';
+function normalizeMode_(mode, allowedModes) {
+  const normalizedMode = String(mode || '').trim().toLowerCase();
+  if (!allowedModes.includes(normalizedMode)) {
+    throw new Error('Invalid form mode.');
   }
 
-  if (nextValue.toUpperCase() === CONFIG.clearToken) {
-    return '';
-  }
-
-  return nextValue;
+  return normalizedMode;
 }
 
-function formatPromptValue_(value) {
-  return String(value || 'blank');
+function requireString_(value, label) {
+  const text = String(value || '').trim();
+  if (!text) {
+    throw new Error(`${label} is required.`);
+  }
+
+  return text;
+}
+
+function requireEmail_(value, label) {
+  const email = requireString_(value, label);
+  if (!isValidEmail_(email)) {
+    throw new Error(`${label} must be a valid email address.`);
+  }
+
+  return email;
+}
+
+function requireChoice_(value, options, label) {
+  const text = requireString_(value, label);
+  const match = options.find((option) => normalizeLookupValue_(option) === normalizeLookupValue_(text));
+  if (!match) {
+    throw new Error(`${label} must be one of: ${options.join(', ')}.`);
+  }
+
+  return match;
+}
+
+function requireDate_(value, label) {
+  const date = parseDateInput_(value);
+  if (!date) {
+    throw new Error(`${label} must use YYYY-MM-DD format.`);
+  }
+
+  return date;
+}
+
+function getSettingsForDialog_(settingsSheet) {
+  const settings = getSettingsMap_(settingsSheet);
+  const settingNames = new Set(DEFAULT_SETTINGS.map((row) => row[0]));
+  Object.keys(settings).forEach((settingName) => settingNames.add(settingName));
+
+  return Array.from(settingNames).map((settingName) => ({
+    name: settingName,
+    value: String(getSetting_(settingName, '') || ''),
+  }));
 }
 
 function parseDateInput_(value) {
@@ -1054,6 +909,10 @@ function parseDateInput_(value) {
     return null;
   }
 
+  if (date.getFullYear() !== parts[0] || date.getMonth() !== parts[1] - 1 || date.getDate() !== parts[2]) {
+    return null;
+  }
+
   return date;
 }
 
@@ -1068,6 +927,11 @@ function findMemberByEmail_(assigneesSheet, email) {
 }
 
 function getMembers_(assigneesSheet) {
+  return getAllMembers_(assigneesSheet)
+    .filter((member) => member.name && normalizeLookupValue_(member.active) !== 'no');
+}
+
+function getAllMembers_(assigneesSheet) {
   const lastRow = assigneesSheet.getLastRow();
   if (lastRow <= 1) {
     return [];
@@ -1081,8 +945,7 @@ function getMembers_(assigneesSheet) {
       name: String(row[0] || '').trim(),
       email: String(row[1] || '').trim(),
       active: String(row[2] || 'Yes').trim(),
-    }))
-    .filter((member) => member.name && normalizeLookupValue_(member.active) !== 'no');
+    }));
 }
 
 function normalizeLookupValue_(value) {
@@ -1420,6 +1283,14 @@ function formatDateForEmail_(value) {
   }
 
   return String(value || 'Not set');
+}
+
+function formatDateForInput_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !Number.isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+
+  return String(value || '').trim();
 }
 
 function escapeHtml_(value) {

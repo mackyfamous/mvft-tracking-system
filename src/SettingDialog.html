@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        color: #202124;
+        background: #ffffff;
+        font-size: 14px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      form {
+        display: grid;
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-weight: 700;
+      }
+
+      input,
+      select {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #dadce0;
+        border-radius: 6px;
+        padding: 9px 10px;
+        color: #202124;
+        font: 14px Arial, sans-serif;
+      }
+
+      .custom {
+        display: none;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      button {
+        border: 1px solid #1a73e8;
+        border-radius: 6px;
+        padding: 9px 14px;
+        font: 700 14px Arial, sans-serif;
+        cursor: pointer;
+      }
+
+      button[type="button"] {
+        color: #1a73e8;
+        background: #ffffff;
+      }
+
+      button[type="submit"] {
+        color: #ffffff;
+        background: #1a73e8;
+      }
+
+      button:disabled {
+        cursor: default;
+        opacity: 0.65;
+      }
+
+      .status {
+        min-height: 20px;
+        color: #188038;
+        font-weight: 700;
+      }
+
+      .status.error {
+        color: #b3261e;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Update setting</h1>
+
+    <form id="setting-form">
+      <label>
+        Setting
+        <select name="settingName" id="setting-name" required></select>
+      </label>
+
+      <label class="custom" id="custom-wrapper">
+        Custom setting name
+        <input name="customSettingName">
+      </label>
+
+      <label>
+        Value
+        <input name="value" id="setting-value">
+      </label>
+
+      <div class="status" id="status"></div>
+
+      <div class="actions">
+        <button type="button" id="cancel">Cancel</button>
+        <button type="submit" id="submit">Save setting</button>
+      </div>
+    </form>
+
+    <script>
+      const DATA = <?!= data ?>;
+      const CUSTOM_VALUE = '__custom__';
+
+      function normalize(value) {
+        return String(value || '').trim().toLowerCase();
+      }
+
+      function selectedSetting() {
+        return (DATA.settings || []).find((setting) => normalize(setting.name) === normalize(DATA.selectedSetting));
+      }
+
+      function settingByName(name) {
+        return (DATA.settings || []).find((setting) => normalize(setting.name) === normalize(name));
+      }
+
+      function fillSettings() {
+        const select = document.getElementById('setting-name');
+        const selected = selectedSetting();
+        select.innerHTML = '';
+
+        (DATA.settings || []).forEach((setting) => {
+          const option = document.createElement('option');
+          option.value = setting.name;
+          option.textContent = setting.name;
+          if (selected && normalize(selected.name) === normalize(setting.name)) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        const custom = document.createElement('option');
+        custom.value = CUSTOM_VALUE;
+        custom.textContent = 'Custom setting';
+        select.appendChild(custom);
+
+        if (selected) {
+          document.getElementById('setting-value').value = selected.value || '';
+        } else if (DATA.settings && DATA.settings.length > 0) {
+          document.getElementById('setting-value').value = DATA.settings[0].value || '';
+        }
+      }
+
+      function updateSettingValue() {
+        const select = document.getElementById('setting-name');
+        const customWrapper = document.getElementById('custom-wrapper');
+        const customInput = document.querySelector('[name="customSettingName"]');
+
+        if (select.value === CUSTOM_VALUE) {
+          customWrapper.style.display = 'grid';
+          customInput.required = true;
+          customInput.focus();
+          document.getElementById('setting-value').value = '';
+          return;
+        }
+
+        customWrapper.style.display = 'none';
+        customInput.required = false;
+        customInput.value = '';
+        const setting = settingByName(select.value);
+        document.getElementById('setting-value').value = setting ? setting.value || '' : '';
+      }
+
+      function collectForm() {
+        const data = {};
+        new FormData(document.getElementById('setting-form')).forEach((value, key) => {
+          data[key] = value;
+        });
+        return data;
+      }
+
+      function setBusy(isBusy) {
+        document.getElementById('submit').disabled = isBusy;
+        document.getElementById('cancel').disabled = isBusy;
+      }
+
+      function setStatus(message, isError) {
+        const status = document.getElementById('status');
+        status.textContent = message || '';
+        status.className = isError ? 'status error' : 'status';
+      }
+
+      function submitSetting(event) {
+        event.preventDefault();
+        setBusy(true);
+        setStatus('Saving setting...', false);
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            setStatus(result.message || 'Setting saved.', false);
+            setTimeout(() => google.script.host.close(), 700);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            setStatus(error.message || 'Unable to save setting.', true);
+          })
+          .submitSettingForm(collectForm());
+      }
+
+      function initialize() {
+        fillSettings();
+        updateSettingValue();
+        document.getElementById('setting-name').addEventListener('change', updateSettingValue);
+        document.getElementById('setting-form').addEventListener('submit', submitSetting);
+        document.getElementById('cancel').addEventListener('click', () => google.script.host.close());
+      }
+
+      initialize();
+    </script>
+  </body>
+</html>

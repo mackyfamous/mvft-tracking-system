@@ -22,6 +22,9 @@ mvft-tracking-system/
 │   └── setup.md
 ├── src/
 │   ├── Code.gs
+│   ├── MemberDialog.html
+│   ├── SettingDialog.html
+│   ├── TaskDialog.html
 │   └── appsscript.json
 ├── .gitignore
 └── README.md
@@ -40,11 +43,12 @@ The script creates and manages three tabs:
 1. Create a Google Sheet in the Google account that will own the tracker.
 2. Open `Extensions > Apps Script`.
 3. Paste the contents of `src/Code.gs`.
-4. Add the `src/appsscript.json` manifest settings if using the Apps Script editor manifest view.
-5. Run `setupTracker`.
-6. Run `installTriggers`.
-7. Add assignees in the `Assignees` tab.
-8. Create tickets in the `Tickets` tab.
+4. Add the HTML files from `src/TaskDialog.html`, `src/MemberDialog.html`, and `src/SettingDialog.html`.
+5. Add the `src/appsscript.json` manifest settings if using the Apps Script editor manifest view.
+6. Run `setupTracker`.
+7. Run `installTriggers`.
+8. Add assignees in the `Assignees` tab.
+9. Create tickets in the `Tickets` tab or use `MVFT Tracker > Task > Add task`.
 
 When a row has a ticket title and assignee email, the assigned person receives an email.
 
@@ -57,6 +61,8 @@ The script adds a `MVFT Tracker` menu with these groups:
 - `Task`: add a task, update the selected task, and send pending assignment emails
 - `Member`: add a member and update the selected member
 - `Settings`: run setup, update a setting, and install the email trigger
+
+The add and update actions open one form dialog with all fields, then save with one submit.
 
 ## Important Note About Email Permissions
 

@@ -26,6 +26,22 @@ MVFT Tracking System
 
 Open `src/Code.gs` from this repository and paste its contents into the Apps Script `Code.gs` file.
 
+Then add three HTML files in Apps Script:
+
+```text
+TaskDialog
+MemberDialog
+SettingDialog
+```
+
+Paste the matching repository files into them:
+
+```text
+src/TaskDialog.html
+src/MemberDialog.html
+src/SettingDialog.html
+```
+
 If the Apps Script editor shows the manifest file `appsscript.json`, replace it with the contents of `src/appsscript.json`. If the manifest is hidden, go to:
 
 ```text
@@ -93,7 +109,7 @@ You can also use:
 MVFT Tracker > Task > Add task
 ```
 
-The menu version prompts for the creator, task details, assignee, due date, and notes.
+The menu version opens one form dialog for the creator, task details, assignee, due date, and notes.
 
 ## Update Tickets
 
@@ -103,7 +119,7 @@ To update an existing ticket through the menu, select any cell in the ticket row
 MVFT Tracker > Task > Update selected task
 ```
 
-The creator listed in `Created By Email` receives an update email when meaningful fields change, such as title, description, priority, status, assignee, due date, or notes.
+This opens one form dialog with the selected task prefilled. The creator listed in `Created By Email` receives an update email when meaningful fields change, such as title, description, priority, status, assignee, due date, or notes.
 
 If editing directly in the sheet, make sure `Created By Email` is filled so creator update notifications can send.
 
@@ -128,6 +144,8 @@ Use the `Settings` tab or this menu item to update defaults:
 ```text
 MVFT Tracker > Settings > Update setting
 ```
+
+This opens one form dialog where you select a setting and update its value.
 
 Available default settings include:
 

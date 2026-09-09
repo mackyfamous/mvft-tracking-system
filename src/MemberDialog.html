@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 20px;
+        color: #202124;
+        background: #ffffff;
+        font-size: 14px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      form {
+        display: grid;
+        gap: 14px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-weight: 700;
+      }
+
+      input,
+      select {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #dadce0;
+        border-radius: 6px;
+        padding: 9px 10px;
+        color: #202124;
+        font: 14px Arial, sans-serif;
+      }
+
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      button {
+        border: 1px solid #1a73e8;
+        border-radius: 6px;
+        padding: 9px 14px;
+        font: 700 14px Arial, sans-serif;
+        cursor: pointer;
+      }
+
+      button[type="button"] {
+        color: #1a73e8;
+        background: #ffffff;
+      }
+
+      button[type="submit"] {
+        color: #ffffff;
+        background: #1a73e8;
+      }
+
+      button:disabled {
+        cursor: default;
+        opacity: 0.65;
+      }
+
+      .status {
+        min-height: 20px;
+        color: #188038;
+        font-weight: 700;
+      }
+
+      .status.error {
+        color: #b3261e;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="title">Member</h1>
+
+    <form id="member-form">
+      <input type="hidden" name="mode">
+      <input type="hidden" name="rowNumber">
+
+      <label>
+        Name
+        <input name="name" required>
+      </label>
+
+      <label>
+        Email
+        <input name="email" type="email" required>
+      </label>
+
+      <label>
+        Active
+        <select name="active" required></select>
+      </label>
+
+      <div class="status" id="status"></div>
+
+      <div class="actions">
+        <button type="button" id="cancel">Cancel</button>
+        <button type="submit" id="submit">Save member</button>
+      </div>
+    </form>
+
+    <script>
+      const DATA = <?!= data ?>;
+
+      function normalize(value) {
+        return String(value || '').trim().toLowerCase();
+      }
+
+      function fillSelect(name, options, selected) {
+        const select = document.querySelector(`[name="${name}"]`);
+        select.innerHTML = '';
+        options.forEach((optionValue) => {
+          const option = document.createElement('option');
+          option.value = optionValue;
+          option.textContent = optionValue;
+          if (normalize(optionValue) === normalize(selected)) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+      }
+
+      function collectForm() {
+        const data = {};
+        new FormData(document.getElementById('member-form')).forEach((value, key) => {
+          data[key] = value;
+        });
+        return data;
+      }
+
+      function setBusy(isBusy) {
+        document.getElementById('submit').disabled = isBusy;
+        document.getElementById('cancel').disabled = isBusy;
+      }
+
+      function setStatus(message, isError) {
+        const status = document.getElementById('status');
+        status.textContent = message || '';
+        status.className = isError ? 'status error' : 'status';
+      }
+
+      function submitMember(event) {
+        event.preventDefault();
+        setBusy(true);
+        setStatus('Saving member...', false);
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            setStatus(result.message || 'Member saved.', false);
+            setTimeout(() => google.script.host.close(), 700);
+          })
+          .withFailureHandler((error) => {
+            setBusy(false);
+            setStatus(error.message || 'Unable to save member.', true);
+          })
+          .submitMemberForm(collectForm());
+      }
+
+      function initialize() {
+        const member = DATA.member || {};
+        const isAdd = DATA.mode === 'add';
+        document.getElementById('title').textContent = isAdd ? 'Add member' : 'Update member';
+        document.querySelector('[name="mode"]').value = DATA.mode || 'add';
+        document.querySelector('[name="rowNumber"]').value = DATA.rowNumber || '';
+        document.querySelector('[name="name"]').value = member.name || '';
+        document.querySelector('[name="email"]').value = member.email || '';
+        fillSelect('active', DATA.activeOptions || [], member.active || 'Yes');
+
+        document.getElementById('member-form').addEventListener('submit', submitMember);
+        document.getElementById('cancel').addEventListener('click', () => google.script.host.close());
+      }
+
+      initialize();
+    </script>
+  </body>
+</html>
