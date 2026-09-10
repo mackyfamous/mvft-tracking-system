@@ -42,7 +42,8 @@ Status:
 ```text
 Open
 In Progress
-Waiting
+On Hold
+Blocked
 Completed
 Cancelled
 ```

@@ -7,7 +7,7 @@ const CONFIG = {
     settings: 'Settings',
   },
   priorities: ['Low', 'Medium', 'High', 'Urgent'],
-  statuses: ['Open', 'In Progress', 'Waiting', 'Completed', 'Cancelled'],
+  statuses: ['Open', 'In Progress', 'On Hold', 'Blocked', 'Completed', 'Cancelled'],
   activeOptions: ['Yes', 'No'],
   defaultPriority: 'Medium',
   defaultStatus: 'Open',
@@ -126,6 +126,7 @@ function ensureTrackerReady_() {
   setHeaderRow_(settingsSheet, SETTINGS_HEADERS);
 
   seedSettings_(settingsSheet);
+  migrateLegacyStatusValues_(ticketsSheet);
   formatTicketsSheet_(ticketsSheet);
   formatAssigneesSheet_(assigneesSheet);
   formatSettingsSheet_(settingsSheet);
@@ -1221,6 +1222,29 @@ function seedSettings_(settingsSheet) {
     settingsSheet
       .getRange(settingsSheet.getLastRow() + 1, 1, rowsToAdd.length, SETTINGS_HEADERS.length)
       .setValues(rowsToAdd);
+  }
+}
+
+function migrateLegacyStatusValues_(ticketsSheet) {
+  const lastRow = ticketsSheet.getLastRow();
+  if (lastRow <= 1) {
+    return;
+  }
+
+  const statusRange = ticketsSheet.getRange(2, COL.STATUS, lastRow - 1, 1);
+  const values = statusRange.getValues();
+  let changed = false;
+  const updatedValues = values.map(([status]) => {
+    if (normalizeLookupValue_(status) === 'waiting') {
+      changed = true;
+      return ['On Hold'];
+    }
+
+    return [status];
+  });
+
+  if (changed) {
+    statusRange.setValues(updatedValues);
   }
 }
 
