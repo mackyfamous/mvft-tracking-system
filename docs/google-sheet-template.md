@@ -2,23 +2,29 @@
 
 You can let the script create these tabs automatically by running `setupTracker`, or create them manually first.
 
-## Tickets Tab
+## Tasks Tab
 
 Create a tab named:
 
 ```text
-Tickets
+Tasks
 ```
 
 Use this header row:
 
 ```text
-Ticket ID	Created At	Updated At	Created By	Created By Email	Title	Description	Priority	Status	Assignee	Assignee Email	Due Date	Assignment Notification Status	Assignment Notified Email	Assignment Notified At	Update Notification Status	Update Notified At	Notes
+Task ID	Created At	Updated At	Created By	Created By Email	Title	Description	Priority	Status	Assignee	Assignee Email	Due Date	Notes	Assignment Notification Status	Assignment Notified Email	Assignment Notified At	Update Notification Status	Update Notified At
 ```
 
-`Created By` should be the requester or creator name. `Created By Email` is used for update notifications when the ticket changes.
+`Created By` should be the requester or creator name. `Created By Email` is used for update notifications when the task changes.
 
-When adding a task from the menu, the `Created by` dropdown is preselected from the current Google user when Apps Script can read the user's email. When a ticket is created by typing directly into the sheet, blank creator fields are filled from the editor email when Google makes it available.
+When adding a task from the menu, the `Created by` dropdown is preselected from the current Google user when Apps Script can read the user's email. If Google does not provide the user and the creator is not in `Members`, choose `Enter manually`. When a task is created by typing directly into the sheet, blank creator fields are filled from the editor email when Google makes it available.
+
+Use names from `Members` for `Created By` and `Assignee` when possible. The script fills the matching email fields from the member list.
+
+`Notes` is the last normal task-entry field. The columns after `Notes` are notification metadata used by the script.
+
+Date columns display as `mm-dd-yy` and remain real date values for sorting/filtering.
 
 Recommended dropdown values:
 
@@ -41,12 +47,12 @@ Completed
 Cancelled
 ```
 
-## Assignees Tab
+## Members Tab
 
 Create a tab named:
 
 ```text
-Assignees
+Members
 ```
 
 Use this header row:

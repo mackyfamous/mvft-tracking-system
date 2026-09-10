@@ -65,6 +65,10 @@
         font-weight: 700;
       }
 
+      .hidden {
+        display: none;
+      }
+
       .actions {
         display: flex;
         justify-content: flex-end;
@@ -108,13 +112,11 @@
   </head>
   <body>
     <h1 id="title">Task</h1>
-    <div class="meta" id="ticket-meta"></div>
+    <div class="meta" id="task-meta"></div>
 
     <form id="task-form">
       <input type="hidden" name="mode">
       <input type="hidden" name="rowNumber">
-
-      <datalist id="members"></datalist>
 
       <div class="grid">
         <label>
@@ -126,6 +128,11 @@
           <input name="createdByEmail" type="email" required>
         </label>
       </div>
+
+      <label class="hidden" id="created-by-custom-label">
+        Created by name
+        <input name="createdByCustom" autocomplete="off">
+      </label>
 
       <label>
         Task title
@@ -151,7 +158,7 @@
       <div class="grid">
         <label>
           Assignee
-          <input name="assignee" list="members" autocomplete="off">
+          <select name="assignee"></select>
         </label>
         <label>
           Assignee email
@@ -233,7 +240,7 @@
         });
       }
 
-      function fillMemberSelect(name, selectedName, selectedEmail) {
+      function fillMemberSelect(name, selectedName, selectedEmail, placeholderText, isRequired, allowCustom) {
         const select = document.querySelector(`[name="${name}"]`);
         const hasSelection = Boolean(normalize(selectedName) || normalize(selectedEmail));
         const options = mergeMembers(
@@ -252,8 +259,8 @@
         if (!hasSelection) {
           const placeholder = document.createElement('option');
           placeholder.value = '';
-          placeholder.textContent = 'Select creator';
-          placeholder.disabled = true;
+          placeholder.textContent = placeholderText;
+          placeholder.disabled = Boolean(isRequired);
           placeholder.selected = true;
           select.appendChild(placeholder);
         }
@@ -275,17 +282,13 @@
           }
           select.appendChild(option);
         });
-      }
 
-      function fillMembers() {
-        const datalist = document.getElementById('members');
-        datalist.innerHTML = '';
-        members.forEach((member) => {
-          const option = document.createElement('option');
-          option.value = member.name;
-          option.label = member.email;
-          datalist.appendChild(option);
-        });
+        if (allowCustom) {
+          const customOption = document.createElement('option');
+          customOption.value = '__custom__';
+          customOption.textContent = 'Enter manually';
+          select.appendChild(customOption);
+        }
       }
 
       function hydrateEmail(nameField, emailField) {
@@ -293,8 +296,12 @@
         const emailInput = document.querySelector(`[name="${emailField}"]`);
         if (nameInput.tagName === 'SELECT') {
           const selectedOption = nameInput.options[nameInput.selectedIndex];
-          if (selectedOption && selectedOption.dataset.email) {
-            emailInput.value = selectedOption.dataset.email;
+          if (selectedOption) {
+            if (selectedOption.value === '__custom__') {
+              emailInput.value = '';
+              return;
+            }
+            emailInput.value = selectedOption.value ? selectedOption.dataset.email || '' : '';
             return;
           }
         }
@@ -311,6 +318,26 @@
           data[key] = value;
         });
         return data;
+      }
+
+      function normalizeCustomCreator(data) {
+        if (data.createdBy === '__custom__') {
+          data.createdBy = data.createdByCustom || '';
+        }
+        delete data.createdByCustom;
+        return data;
+      }
+
+      function toggleCustomCreator() {
+        const select = document.querySelector('[name="createdBy"]');
+        const customLabel = document.getElementById('created-by-custom-label');
+        const customInput = document.querySelector('[name="createdByCustom"]');
+        const isCustom = select.value === '__custom__';
+        customLabel.className = isCustom ? '' : 'hidden';
+        customInput.required = isCustom;
+        if (!isCustom) {
+          customInput.value = '';
+        }
       }
 
       function setBusy(isBusy) {
@@ -338,43 +365,45 @@
             setBusy(false);
             setStatus(error.message || 'Unable to save task.', true);
           })
-          .submitTaskForm(collectForm());
+          .submitTaskForm(normalizeCustomCreator(collectForm()));
       }
 
       function initialize() {
-        const ticket = DATA.ticket || {};
+        const task = DATA.task || DATA.ticket || {};
         const isAdd = DATA.mode === 'add';
         document.getElementById('title').textContent = isAdd ? 'Add task' : 'Update task';
         document.querySelector('[name="mode"]').value = DATA.mode || 'add';
         document.querySelector('[name="rowNumber"]').value = DATA.rowNumber || '';
 
         if (!isAdd) {
-          const meta = document.getElementById('ticket-meta');
-          meta.textContent = `Editing ${ticket.ticketId || `row ${DATA.rowNumber}`}`;
+          const meta = document.getElementById('task-meta');
+          meta.textContent = `Editing ${task.taskId || task.ticketId || `row ${DATA.rowNumber}`}`;
           meta.style.display = 'block';
         }
 
-        fillMembers();
-        fillMemberSelect('createdBy', ticket.createdBy, ticket.createdByEmail);
-        fillSelect('priority', DATA.priorities || [], ticket.priority);
-        fillSelect('status', DATA.statuses || [], ticket.status);
+        fillMemberSelect('createdBy', task.createdBy, task.createdByEmail, 'Select creator', true, true);
+        fillMemberSelect('assignee', task.assignee, task.assigneeEmail, 'Select assignee', false, false);
+        fillSelect('priority', DATA.priorities || [], task.priority);
+        fillSelect('status', DATA.statuses || [], task.status);
 
-        setField('createdByEmail', ticket.createdByEmail);
-        setField('title', ticket.title);
-        setField('description', ticket.description);
-        setField('assignee', ticket.assignee);
-        setField('assigneeEmail', ticket.assigneeEmail);
-        setField('dueDate', ticket.dueDate);
-        setField('notes', ticket.notes);
+        setField('createdByEmail', task.createdByEmail);
+        setField('title', task.title);
+        setField('description', task.description);
+        setField('assigneeEmail', task.assigneeEmail);
+        setField('dueDate', task.dueDate);
+        setField('notes', task.notes);
 
         document.querySelector('[name="createdBy"]').addEventListener('change', () => {
+          toggleCustomCreator();
           hydrateEmail('createdBy', 'createdByEmail');
         });
+        toggleCustomCreator();
         hydrateEmail('createdBy', 'createdByEmail');
 
         document.querySelector('[name="assignee"]').addEventListener('change', () => {
           hydrateEmail('assignee', 'assigneeEmail');
         });
+        hydrateEmail('assignee', 'assigneeEmail');
         document.getElementById('task-form').addEventListener('submit', submitTask);
         document.getElementById('cancel').addEventListener('click', () => google.script.host.close());
       }

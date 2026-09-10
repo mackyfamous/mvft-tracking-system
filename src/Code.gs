@@ -2,8 +2,8 @@ const CONFIG = {
   trackerName: 'MVFT Tracking System',
   notificationPrefix: '[MVFT]',
   sheets: {
-    tickets: 'Tickets',
-    assignees: 'Assignees',
+    tasks: 'Tasks',
+    members: 'Members',
     settings: 'Settings',
   },
   priorities: ['Low', 'Medium', 'High', 'Urgent'],
@@ -11,11 +11,11 @@ const CONFIG = {
   activeOptions: ['Yes', 'No'],
   defaultPriority: 'Medium',
   defaultStatus: 'Open',
-  ticketPrefix: 'MVFT',
+  taskPrefix: 'MVFT',
 };
 
-const TICKET_HEADERS = [
-  'Ticket ID',
+const TASK_HEADERS = [
+  'Task ID',
   'Created At',
   'Updated At',
   'Created By',
@@ -27,19 +27,19 @@ const TICKET_HEADERS = [
   'Assignee',
   'Assignee Email',
   'Due Date',
+  'Notes',
   'Assignment Notification Status',
   'Assignment Notified Email',
   'Assignment Notified At',
   'Update Notification Status',
   'Update Notified At',
-  'Notes',
 ];
 
-const ASSIGNEE_HEADERS = ['Name', 'Email', 'Active'];
+const MEMBER_HEADERS = ['Name', 'Email', 'Active'];
 const SETTINGS_HEADERS = ['Setting', 'Value'];
 
 const COL = {
-  TICKET_ID: 1,
+  TASK_ID: 1,
   CREATED_AT: 2,
   UPDATED_AT: 3,
   CREATED_BY: 4,
@@ -51,15 +51,16 @@ const COL = {
   ASSIGNEE: 10,
   ASSIGNEE_EMAIL: 11,
   DUE_DATE: 12,
-  ASSIGNMENT_NOTIFICATION_STATUS: 13,
-  ASSIGNMENT_NOTIFIED_EMAIL: 14,
-  ASSIGNMENT_NOTIFIED_AT: 15,
-  UPDATE_NOTIFICATION_STATUS: 16,
-  UPDATE_NOTIFIED_AT: 17,
-  NOTES: 18,
+  NOTES: 13,
+  ASSIGNMENT_NOTIFICATION_STATUS: 14,
+  ASSIGNMENT_NOTIFIED_EMAIL: 15,
+  ASSIGNMENT_NOTIFIED_AT: 16,
+  UPDATE_NOTIFICATION_STATUS: 17,
+  UPDATE_NOTIFIED_AT: 18,
 };
 
-const TICKET_HEADER_ALIASES = {
+const TASK_HEADER_ALIASES = {
+  'Ticket ID': 'Task ID',
   'Notification Status': 'Assignment Notification Status',
   'Notified Email': 'Assignment Notified Email',
   'Notified At': 'Assignment Notified At',
@@ -116,12 +117,12 @@ function setupTracker() {
 
 function ensureTrackerReady_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const ticketsSheet = getOrCreateSheet_(ss, CONFIG.sheets.tickets);
-  const assigneesSheet = getOrCreateSheet_(ss, CONFIG.sheets.assignees);
+  const ticketsSheet = getOrCreateSheet_(ss, CONFIG.sheets.tasks, ['Tickets']);
+  const assigneesSheet = getOrCreateSheet_(ss, CONFIG.sheets.members, ['Assignees']);
   const settingsSheet = getOrCreateSheet_(ss, CONFIG.sheets.settings);
 
-  setHeaderRow_(ticketsSheet, TICKET_HEADERS, TICKET_HEADER_ALIASES);
-  setHeaderRow_(assigneesSheet, ASSIGNEE_HEADERS);
+  setHeaderRow_(ticketsSheet, TASK_HEADERS, TASK_HEADER_ALIASES);
+  setHeaderRow_(assigneesSheet, MEMBER_HEADERS);
   setHeaderRow_(settingsSheet, SETTINGS_HEADERS);
 
   seedSettings_(settingsSheet);
@@ -138,10 +139,10 @@ function ensureTrackerReady_() {
 function installTriggers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ScriptApp.getProjectTriggers()
-    .filter((trigger) => trigger.getHandlerFunction() === 'handleTicketEdit')
+    .filter((trigger) => ['handleTaskEdit', 'handleTicketEdit'].includes(trigger.getHandlerFunction()))
     .forEach((trigger) => ScriptApp.deleteTrigger(trigger));
 
-  ScriptApp.newTrigger('handleTicketEdit')
+  ScriptApp.newTrigger('handleTaskEdit')
     .forSpreadsheet(ss)
     .onEdit()
     .create();
@@ -150,12 +151,16 @@ function installTriggers() {
 }
 
 function handleTicketEdit(e) {
+  handleTaskEdit(e);
+}
+
+function handleTaskEdit(e) {
   if (!e || !e.range) {
     return;
   }
 
   const sheet = e.range.getSheet();
-  if (sheet.getName() !== CONFIG.sheets.tickets) {
+  if (sheet.getName() !== CONFIG.sheets.tasks) {
     return;
   }
 
@@ -189,7 +194,7 @@ function sendPendingAssignmentNotifications() {
 
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) {
-    alertUser_('No tickets found.');
+    alertUser_('No tasks found.');
     return;
   }
 
@@ -241,15 +246,15 @@ function showTaskDialog_(mode) {
   let ticket = defaultTaskDialogTicket_(currentUser);
 
   if (mode === 'update') {
-    if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.tickets || activeRange.getRow() <= 1) {
-      alertUser_('Select a task row in the Tickets tab before using Update selected task.');
+    if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.tasks || activeRange.getRow() <= 1) {
+      alertUser_('Select a task row in the Tasks tab before using Update selected task.');
       return;
     }
 
     rowNumber = activeRange.getRow();
     const row = getTicketRow_(ticketsSheet, rowNumber);
     if (isBlankTicketRow_(row)) {
-      alertUser_('The selected ticket row is blank.');
+      alertUser_('The selected task row is blank.');
       return;
     }
 
@@ -259,7 +264,7 @@ function showTaskDialog_(mode) {
   showDialog_('TaskDialog', mode === 'add' ? 'Add Task' : 'Update Task', {
     mode,
     rowNumber,
-    ticket,
+    task: ticket,
     priorities: CONFIG.priorities,
     statuses: CONFIG.statuses,
     members: getMembers_(assigneesSheet),
@@ -275,10 +280,10 @@ function submitTaskForm(form) {
   if (mode === 'add') {
     const now = new Date();
     const rowNumber = ticketsSheet.getLastRow() + 1;
-    const ticketId = nextTicketId_();
+    const taskId = nextTaskId_();
     const row = emptyTicketRow_();
 
-    row[COL.TICKET_ID - 1] = ticketId;
+    row[COL.TASK_ID - 1] = taskId;
     row[COL.CREATED_AT - 1] = now;
     row[COL.UPDATED_AT - 1] = now;
     row[COL.CREATED_BY - 1] = task.createdBy;
@@ -292,12 +297,12 @@ function submitTaskForm(form) {
     row[COL.DUE_DATE - 1] = task.dueDate || '';
     row[COL.NOTES - 1] = task.notes;
 
-    ticketsSheet.getRange(rowNumber, 1, 1, TICKET_HEADERS.length).setValues([row]);
+    ticketsSheet.getRange(rowNumber, 1, 1, TASK_HEADERS.length).setValues([row]);
     maybeSendAssignmentEmail_(ticketsSheet, rowNumber);
     saveTicketSnapshot_(mapTicketRow_(getTicketRow_(ticketsSheet, rowNumber)));
     ticketsSheet.setActiveRange(ticketsSheet.getRange(rowNumber, COL.TITLE));
 
-    return { message: `Task ${ticketId} was created.` };
+    return { message: `Task ${taskId} was created.` };
   }
 
   const rowNumber = Number(form.rowNumber);
@@ -307,7 +312,7 @@ function submitTaskForm(form) {
 
   const previousTicket = mapTicketRow_(getTicketRow_(ticketsSheet, rowNumber));
   if (isBlankTicketRow_(getTicketRow_(ticketsSheet, rowNumber))) {
-    throw new Error('The selected ticket row is blank.');
+    throw new Error('The selected task row is blank.');
   }
 
   const row = getTicketRow_(ticketsSheet, rowNumber);
@@ -322,7 +327,7 @@ function submitTaskForm(form) {
   row[COL.DUE_DATE - 1] = task.dueDate || '';
   row[COL.NOTES - 1] = task.notes;
 
-  ticketsSheet.getRange(rowNumber, 1, 1, TICKET_HEADERS.length).setValues([row]);
+  ticketsSheet.getRange(rowNumber, 1, 1, TASK_HEADERS.length).setValues([row]);
   normalizeTicketRow_(ticketsSheet, rowNumber);
   maybeHydrateMemberEmails_(ticketsSheet, rowNumber);
   maybeSendAssignmentEmail_(ticketsSheet, rowNumber);
@@ -331,7 +336,7 @@ function submitTaskForm(form) {
   maybeSendCreatorUpdateEmail_(ticketsSheet, rowNumber, snapshotTicket_(previousTicket), currentTicket, getActiveUserEmail_());
   saveTicketSnapshot_(currentTicket);
 
-  return { message: `Task ${currentTicket.ticketId || rowNumber} was updated.` };
+  return { message: `Task ${currentTicket.taskId || rowNumber} was updated.` };
 }
 
 function showMemberDialog_(mode) {
@@ -341,13 +346,13 @@ function showMemberDialog_(mode) {
   let member = { name: '', email: '', active: 'Yes' };
 
   if (mode === 'update') {
-    if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.assignees || activeRange.getRow() <= 1) {
-      alertUser_('Select a member row in the Assignees tab before using Update selected member.');
+    if (!activeRange || activeRange.getSheet().getName() !== CONFIG.sheets.members || activeRange.getRow() <= 1) {
+      alertUser_('Select a member row in the Members tab before using Update selected member.');
       return;
     }
 
     rowNumber = activeRange.getRow();
-    const row = assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).getValues()[0];
+    const row = assigneesSheet.getRange(rowNumber, 1, 1, MEMBER_HEADERS.length).getValues()[0];
     member = {
       name: String(row[0] || '').trim(),
       email: String(row[1] || '').trim(),
@@ -380,7 +385,7 @@ function submitMemberForm(form) {
   );
 
   if (duplicate) {
-    throw new Error('That email already exists in the Assignees tab.');
+    throw new Error('That email already exists in the Members tab.');
   }
 
   if (mode === 'update') {
@@ -388,13 +393,13 @@ function submitMemberForm(form) {
       throw new Error('Select a valid member row before updating.');
     }
 
-    assigneesSheet.getRange(rowNumber, 1, 1, ASSIGNEE_HEADERS.length).setValues([[name, email, active]]);
+    assigneesSheet.getRange(rowNumber, 1, 1, MEMBER_HEADERS.length).setValues([[name, email, active]]);
     applyValidations_(ticketsSheet, assigneesSheet);
     return { message: `Member ${name} was updated.` };
   }
 
   const newRowNumber = assigneesSheet.getLastRow() + 1;
-  assigneesSheet.getRange(newRowNumber, 1, 1, ASSIGNEE_HEADERS.length).setValues([[name, email, active]]);
+  assigneesSheet.getRange(newRowNumber, 1, 1, MEMBER_HEADERS.length).setValues([[name, email, active]]);
   applyValidations_(ticketsSheet, assigneesSheet);
   assigneesSheet.setActiveRange(assigneesSheet.getRange(newRowNumber, 1));
 
@@ -443,8 +448,8 @@ function normalizeTicketRow_(sheet, rowNumber, editorEmail) {
   const shouldFillCreatorName = !createdBy && (createdByEmail || editorEmail);
   const shouldFillCreatorEmail = !createdBy && !createdByEmail && editorEmail;
 
-  if (!row[COL.TICKET_ID - 1]) {
-    sheet.getRange(rowNumber, COL.TICKET_ID).setValue(nextTicketId_());
+  if (!row[COL.TASK_ID - 1]) {
+    sheet.getRange(rowNumber, COL.TASK_ID).setValue(nextTaskId_());
   }
 
   if (!row[COL.CREATED_AT - 1]) {
@@ -452,7 +457,7 @@ function normalizeTicketRow_(sheet, rowNumber, editorEmail) {
   }
 
   if (shouldFillCreatorName || shouldFillCreatorEmail) {
-    const assigneesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheets.assignees);
+    const assigneesSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.sheets.members);
     const currentUser = getCurrentUserProfile_(assigneesSheet, createdByEmail || editorEmail);
 
     if (shouldFillCreatorName && currentUser.name) {
@@ -533,16 +538,16 @@ function buildAssignmentEmail_(ticket) {
   const sheetUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
   const trackerName = getSetting_('Tracker Name', CONFIG.trackerName);
   const prefix = getSetting_('Notification Prefix', CONFIG.notificationPrefix);
-  const subject = `${prefix} New assignment: ${ticket.ticketId || ticket.title}`;
+  const subject = `${prefix} New assignment: ${ticket.taskId || ticket.title}`;
   const dueDate = formatDateForEmail_(ticket.dueDate);
   const assigneeName = ticket.assignee || 'there';
 
   const body = [
     `Hi ${assigneeName},`,
     '',
-    `You have been assigned a new ${trackerName} ticket.`,
+    `You have been assigned a new ${trackerName} task.`,
     '',
-    `Ticket ID: ${ticket.ticketId || 'Pending ID'}`,
+    `Task ID: ${ticket.taskId || 'Pending ID'}`,
     `Title: ${ticket.title}`,
     `Priority: ${ticket.priority || CONFIG.defaultPriority}`,
     `Status: ${ticket.status || CONFIG.defaultStatus}`,
@@ -558,9 +563,9 @@ function buildAssignmentEmail_(ticket) {
 
   const htmlBody = `
     <p>Hi ${escapeHtml_(assigneeName)},</p>
-    <p>You have been assigned a new <strong>${escapeHtml_(trackerName)}</strong> ticket.</p>
+    <p>You have been assigned a new <strong>${escapeHtml_(trackerName)}</strong> task.</p>
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#d9d9d9;">
-      <tr><td><strong>Ticket ID</strong></td><td>${escapeHtml_(ticket.ticketId || 'Pending ID')}</td></tr>
+      <tr><td><strong>Task ID</strong></td><td>${escapeHtml_(ticket.taskId || 'Pending ID')}</td></tr>
       <tr><td><strong>Title</strong></td><td>${escapeHtml_(ticket.title)}</td></tr>
       <tr><td><strong>Priority</strong></td><td>${escapeHtml_(ticket.priority || CONFIG.defaultPriority)}</td></tr>
       <tr><td><strong>Status</strong></td><td>${escapeHtml_(ticket.status || CONFIG.defaultStatus)}</td></tr>
@@ -622,7 +627,7 @@ function buildCreatorUpdateEmail_(ticket, changes, editorEmail) {
   const sheetUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
   const trackerName = getSetting_('Tracker Name', CONFIG.trackerName);
   const prefix = getSetting_('Notification Prefix', CONFIG.notificationPrefix);
-  const subject = `${prefix} Ticket updated: ${ticket.ticketId || ticket.title}`;
+  const subject = `${prefix} Task updated: ${ticket.taskId || ticket.title}`;
   const dueDate = formatDateForEmail_(ticket.dueDate);
   const creatorName = ticket.createdBy || 'there';
   const updatedBy = editorEmail || 'A team member';
@@ -631,9 +636,9 @@ function buildCreatorUpdateEmail_(ticket, changes, editorEmail) {
   const body = [
     `Hi ${creatorName},`,
     '',
-    `A ${trackerName} ticket you created was updated.`,
+    `A ${trackerName} task you created was updated.`,
     '',
-    `Ticket ID: ${ticket.ticketId || 'Pending ID'}`,
+    `Task ID: ${ticket.taskId || 'Pending ID'}`,
     `Title: ${ticket.title}`,
     `Updated By: ${updatedBy}`,
     `Priority: ${ticket.priority || CONFIG.defaultPriority}`,
@@ -649,9 +654,9 @@ function buildCreatorUpdateEmail_(ticket, changes, editorEmail) {
 
   const htmlBody = `
     <p>Hi ${escapeHtml_(creatorName)},</p>
-    <p>A <strong>${escapeHtml_(trackerName)}</strong> ticket you created was updated.</p>
+    <p>A <strong>${escapeHtml_(trackerName)}</strong> task you created was updated.</p>
     <table cellpadding="6" cellspacing="0" border="1" style="border-collapse:collapse;border-color:#d9d9d9;">
-      <tr><td><strong>Ticket ID</strong></td><td>${escapeHtml_(ticket.ticketId || 'Pending ID')}</td></tr>
+      <tr><td><strong>Task ID</strong></td><td>${escapeHtml_(ticket.taskId || 'Pending ID')}</td></tr>
       <tr><td><strong>Title</strong></td><td>${escapeHtml_(ticket.title)}</td></tr>
       <tr><td><strong>Updated By</strong></td><td>${escapeHtml_(updatedBy)}</td></tr>
       <tr><td><strong>Priority</strong></td><td>${escapeHtml_(ticket.priority || CONFIG.defaultPriority)}</td></tr>
@@ -676,7 +681,7 @@ function buildCreatorUpdateEmail_(ticket, changes, editorEmail) {
 
 function maybeHydrateMemberEmails_(ticketsSheet, rowNumber) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const assigneesSheet = ss.getSheetByName(CONFIG.sheets.assignees);
+  const assigneesSheet = ss.getSheetByName(CONFIG.sheets.members);
   if (!assigneesSheet) {
     return;
   }
@@ -687,28 +692,36 @@ function maybeHydrateMemberEmails_(ticketsSheet, rowNumber) {
   const assignee = String(row[COL.ASSIGNEE - 1] || '').trim();
   const assigneeEmail = String(row[COL.ASSIGNEE_EMAIL - 1] || '').trim();
 
-  if (createdBy && !createdByEmail) {
+  if (createdBy) {
     const creatorMember = findMemberByName_(assigneesSheet, createdBy);
-    if (creatorMember && creatorMember.email) {
+    if (
+      creatorMember &&
+      creatorMember.email &&
+      normalizeLookupValue_(createdByEmail) !== normalizeLookupValue_(creatorMember.email)
+    ) {
       ticketsSheet.getRange(rowNumber, COL.CREATED_BY_EMAIL).setValue(creatorMember.email);
     }
   }
 
-  if (assignee && !assigneeEmail) {
+  if (assignee) {
     const assigneeMember = findMemberByName_(assigneesSheet, assignee);
-    if (assigneeMember && assigneeMember.email) {
+    if (
+      assigneeMember &&
+      assigneeMember.email &&
+      normalizeLookupValue_(assigneeEmail) !== normalizeLookupValue_(assigneeMember.email)
+    ) {
       ticketsSheet.getRange(rowNumber, COL.ASSIGNEE_EMAIL).setValue(assigneeMember.email);
     }
   }
 }
 
 function getTicketRow_(sheet, rowNumber) {
-  return sheet.getRange(rowNumber, 1, 1, TICKET_HEADERS.length).getValues()[0];
+  return sheet.getRange(rowNumber, 1, 1, TASK_HEADERS.length).getValues()[0];
 }
 
 function mapTicketRow_(row) {
   return {
-    ticketId: row[COL.TICKET_ID - 1],
+    taskId: row[COL.TASK_ID - 1],
     createdAt: row[COL.CREATED_AT - 1],
     updatedAt: row[COL.UPDATED_AT - 1],
     createdBy: String(row[COL.CREATED_BY - 1] || '').trim(),
@@ -738,6 +751,7 @@ function isBlankTicketRow_(row) {
     row[COL.ASSIGNEE - 1],
     row[COL.ASSIGNEE_EMAIL - 1],
     row[COL.DUE_DATE - 1],
+    row[COL.NOTES - 1],
   ];
 
   return importantValues.every((value) => String(value || '').trim() === '');
@@ -752,7 +766,7 @@ function isValidEmail_(email) {
 }
 
 function emptyTicketRow_() {
-  return Array(TICKET_HEADERS.length).fill('');
+  return Array(TASK_HEADERS.length).fill('');
 }
 
 function showDialog_(templateName, title, data) {
@@ -771,7 +785,7 @@ function defaultTaskDialogTicket_(currentUser) {
   const creator = currentUser || { name: '', email: '' };
 
   return {
-    ticketId: '',
+    taskId: '',
     createdBy: creator.name || '',
     createdByEmail: creator.email || '',
     title: '',
@@ -787,7 +801,7 @@ function defaultTaskDialogTicket_(currentUser) {
 
 function serializeTicketForDialog_(ticket) {
   return {
-    ticketId: String(ticket.ticketId || '').trim(),
+    taskId: String(ticket.taskId || ticket.ticketId || '').trim(),
     createdBy: String(ticket.createdBy || '').trim(),
     createdByEmail: String(ticket.createdByEmail || '').trim(),
     title: String(ticket.title || '').trim(),
@@ -803,7 +817,10 @@ function serializeTicketForDialog_(ticket) {
 
 function normalizeTaskForm_(form, assigneesSheet, currentUser) {
   const creator = currentUser || { name: '', email: '' };
-  const formCreatedBy = String(form.createdBy || '').trim();
+  const formCreatedBy =
+    String(form.createdBy || '').trim() === '__custom__'
+      ? String(form.createdByCustom || '').trim()
+      : String(form.createdBy || '').trim();
   const formCreatedByEmail = String(form.createdByEmail || '').trim();
   const useCurrentUser = !formCreatedBy && !formCreatedByEmail;
   const createdBy = hydrateMemberFromForm_(
@@ -974,7 +991,7 @@ function getAllMembers_(assigneesSheet) {
   }
 
   return assigneesSheet
-    .getRange(2, 1, lastRow - 1, ASSIGNEE_HEADERS.length)
+    .getRange(2, 1, lastRow - 1, MEMBER_HEADERS.length)
     .getValues()
     .map((row, index) => ({
       rowNumber: index + 2,
@@ -990,15 +1007,16 @@ function normalizeLookupValue_(value) {
 
 function getStoredTicketSnapshotForRow_(sheet, rowNumber) {
   const ticket = mapTicketRow_(getTicketRow_(sheet, rowNumber));
-  if (!ticket.ticketId) {
+  if (!ticket.taskId) {
     return null;
   }
 
-  return getStoredTicketSnapshot_(ticket.ticketId);
+  return getStoredTicketSnapshot_(ticket.taskId);
 }
 
-function getStoredTicketSnapshot_(ticketId) {
-  const rawValue = PropertiesService.getDocumentProperties().getProperty(ticketSnapshotKey_(ticketId));
+function getStoredTicketSnapshot_(taskId) {
+  const props = PropertiesService.getDocumentProperties();
+  const rawValue = props.getProperty(ticketSnapshotKey_(taskId)) || props.getProperty(`TICKET_SNAPSHOT_${taskId}`);
   if (!rawValue) {
     return null;
   }
@@ -1012,11 +1030,11 @@ function getStoredTicketSnapshot_(ticketId) {
 }
 
 function saveTicketSnapshot_(ticket) {
-  if (!ticket || !ticket.ticketId) {
+  if (!ticket || !ticket.taskId) {
     return;
   }
 
-  PropertiesService.getDocumentProperties().setProperty(ticketSnapshotKey_(ticket.ticketId), JSON.stringify(snapshotTicket_(ticket)));
+  PropertiesService.getDocumentProperties().setProperty(ticketSnapshotKey_(ticket.taskId), JSON.stringify(snapshotTicket_(ticket)));
 }
 
 function syncTicketSnapshots_(ticketsSheet) {
@@ -1027,19 +1045,19 @@ function syncTicketSnapshots_(ticketsSheet) {
 
   for (let row = 2; row <= lastRow; row += 1) {
     const ticket = mapTicketRow_(getTicketRow_(ticketsSheet, row));
-    if (ticket.ticketId && !isBlankTicketRow_(getTicketRow_(ticketsSheet, row))) {
+    if (ticket.taskId && !isBlankTicketRow_(getTicketRow_(ticketsSheet, row))) {
       saveTicketSnapshot_(ticket);
     }
   }
 }
 
-function ticketSnapshotKey_(ticketId) {
-  return `TICKET_SNAPSHOT_${ticketId}`;
+function ticketSnapshotKey_(taskId) {
+  return `TASK_SNAPSHOT_${taskId}`;
 }
 
 function snapshotTicket_(ticket) {
   return {
-    ticketId: String(ticket.ticketId || '').trim(),
+    taskId: String(ticket.taskId || ticket.ticketId || '').trim(),
     createdBy: String(ticket.createdBy || '').trim(),
     createdByEmail: String(ticket.createdByEmail || '').trim(),
     title: String(ticket.title || '').trim(),
@@ -1125,27 +1143,30 @@ function isSettingEnabled_(key, fallback) {
   return ['yes', 'true', 'enabled', 'on', '1'].includes(value);
 }
 
-function nextTicketId_() {
+function nextTaskId_() {
   const props = PropertiesService.getDocumentProperties();
-  const currentValue = Number(props.getProperty('NEXT_TICKET_NUMBER') || '1');
+  const currentValue = Number(props.getProperty('NEXT_TASK_NUMBER') || props.getProperty('NEXT_TICKET_NUMBER') || '1');
   const nextValue = Number.isFinite(currentValue) && currentValue > 0 ? currentValue : 1;
+  props.setProperty('NEXT_TASK_NUMBER', String(nextValue + 1));
   props.setProperty('NEXT_TICKET_NUMBER', String(nextValue + 1));
-  return `${CONFIG.ticketPrefix}-${String(nextValue).padStart(4, '0')}`;
+  return `${CONFIG.taskPrefix}-${String(nextValue).padStart(4, '0')}`;
 }
 
 function syncTicketCounter_(ticketsSheet) {
   const lastRow = ticketsSheet.getLastRow();
   if (lastRow <= 1) {
+    PropertiesService.getDocumentProperties().setProperty('NEXT_TASK_NUMBER', '1');
     PropertiesService.getDocumentProperties().setProperty('NEXT_TICKET_NUMBER', '1');
     return;
   }
 
-  const ticketIds = ticketsSheet.getRange(2, COL.TICKET_ID, lastRow - 1, 1).getValues().flat();
+  const ticketIds = ticketsSheet.getRange(2, COL.TASK_ID, lastRow - 1, 1).getValues().flat();
   const highestNumber = ticketIds.reduce((highest, ticketId) => {
-    const match = String(ticketId || '').match(new RegExp(`^${CONFIG.ticketPrefix}-(\\d+)$`));
+    const match = String(ticketId || '').match(new RegExp(`^${CONFIG.taskPrefix}-(\\d+)$`));
     return match ? Math.max(highest, Number(match[1])) : highest;
   }, 0);
 
+  PropertiesService.getDocumentProperties().setProperty('NEXT_TASK_NUMBER', String(highestNumber + 1));
   PropertiesService.getDocumentProperties().setProperty('NEXT_TICKET_NUMBER', String(highestNumber + 1));
 }
 
@@ -1212,7 +1233,7 @@ function applyValidations_(ticketsSheet, assigneesSheet) {
     return;
   }
 
-  ticketsSheet.getRange(2, 1, maxRows - 1, TICKET_HEADERS.length).clearDataValidations();
+  ticketsSheet.getRange(2, 1, maxRows - 1, TASK_HEADERS.length).clearDataValidations();
 
   const priorityRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(CONFIG.priorities, true)
@@ -1249,24 +1270,24 @@ function applyValidations_(ticketsSheet, assigneesSheet) {
 }
 
 function formatTicketsSheet_(sheet) {
-  sheet.getRange(1, 1, 1, TICKET_HEADERS.length).setFontWeight('bold').setBackground('#e8f0fe');
-  sheet.getRange(2, COL.CREATED_AT, Math.max(sheet.getMaxRows() - 1, 1), 2).setNumberFormat('yyyy-mm-dd hh:mm');
-  sheet.getRange(2, COL.DUE_DATE, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat('yyyy-mm-dd');
+  sheet.getRange(1, 1, 1, TASK_HEADERS.length).setFontWeight('bold').setBackground('#e8f0fe');
+  sheet.getRange(2, COL.CREATED_AT, Math.max(sheet.getMaxRows() - 1, 1), 2).setNumberFormat('mm-dd-yy hh:mm');
+  sheet.getRange(2, COL.DUE_DATE, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat('mm-dd-yy');
   sheet
     .getRange(2, COL.ASSIGNMENT_NOTIFIED_AT, Math.max(sheet.getMaxRows() - 1, 1), 1)
-    .setNumberFormat('yyyy-mm-dd hh:mm');
+    .setNumberFormat('mm-dd-yy hh:mm');
   sheet
     .getRange(2, COL.UPDATE_NOTIFIED_AT, Math.max(sheet.getMaxRows() - 1, 1), 1)
-    .setNumberFormat('yyyy-mm-dd hh:mm');
+    .setNumberFormat('mm-dd-yy hh:mm');
 
-  const widths = [110, 145, 145, 160, 220, 220, 320, 110, 130, 160, 220, 120, 210, 220, 145, 190, 145, 300];
+  const widths = [110, 145, 145, 160, 220, 220, 320, 110, 130, 160, 220, 120, 300, 210, 220, 145, 190, 145];
   widths.forEach((width, index) => sheet.setColumnWidth(index + 1, width));
 
   ensureFilter_(sheet);
 }
 
 function formatAssigneesSheet_(sheet) {
-  sheet.getRange(1, 1, 1, ASSIGNEE_HEADERS.length).setFontWeight('bold').setBackground('#e8f0fe');
+  sheet.getRange(1, 1, 1, MEMBER_HEADERS.length).setFontWeight('bold').setBackground('#e8f0fe');
   sheet.setColumnWidths(1, 1, 180);
   sheet.setColumnWidths(2, 1, 240);
   sheet.setColumnWidths(3, 1, 90);
@@ -1285,8 +1306,22 @@ function ensureFilter_(sheet) {
   }
 }
 
-function getOrCreateSheet_(ss, sheetName) {
-  return ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+function getOrCreateSheet_(ss, sheetName, legacySheetNames) {
+  const existingSheet = ss.getSheetByName(sheetName);
+  if (existingSheet) {
+    return existingSheet;
+  }
+
+  const legacyNames = legacySheetNames || [];
+  for (let index = 0; index < legacyNames.length; index += 1) {
+    const legacySheet = ss.getSheetByName(legacyNames[index]);
+    if (legacySheet) {
+      legacySheet.setName(sheetName);
+      return legacySheet;
+    }
+  }
+
+  return ss.insertSheet(sheetName);
 }
 
 function getSetting_(key, fallback) {
@@ -1341,7 +1376,7 @@ function findSettingRow_(settingsSheet, key) {
 
 function formatDateForEmail_(value) {
   if (Object.prototype.toString.call(value) === '[object Date]' && !Number.isNaN(value.getTime())) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'MMM d, yyyy');
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'MM-dd-yy');
   }
 
   return String(value || 'Not set');

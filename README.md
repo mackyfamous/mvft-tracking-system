@@ -1,15 +1,15 @@
 # MVFT Tracking System
 
-Google Sheets ticket and task tracker with Apps Script email notifications.
+Google Sheets task tracker with Apps Script email notifications.
 
 ## What This Provides
 
-- A structured ticket tracker for MVFT tasks and requests
-- Auto-generated ticket IDs such as `MVFT-0001`
+- A structured task tracker for MVFT tasks and requests
+- Auto-generated task IDs such as `MVFT-0001`
 - Dropdowns for priority, status, and assignee
-- Email notification when a ticket is assigned
+- Email notification when a task is assigned
 - Creator tracking with `Created By` and `Created By Email`, prefilled from the current Google user when available
-- Email notification to the creator when an existing ticket is updated
+- Email notification to the creator when an existing task is updated
 - Duplicate-send protection using the last notified assignee email
 - Grouped menu actions for tasks, members, and settings inside Google Sheets
 
@@ -34,9 +34,11 @@ mvft-tracking-system/
 
 The script creates and manages three tabs:
 
-- `Tickets`: main tracker for tasks and tickets
-- `Assignees`: list of team members and their email addresses
+- `Tasks`: main tracker for tasks
+- `Members`: list of team members and their email addresses
 - `Settings`: basic configuration values
+
+If an older sheet has `Tickets` or `Assignees`, running `setupTracker` renames them to `Tasks` and `Members`.
 
 ## Core Workflow
 
@@ -47,14 +49,20 @@ The script creates and manages three tabs:
 5. Add the `src/appsscript.json` manifest settings if using the Apps Script editor manifest view.
 6. Run `setupTracker`.
 7. Run `installTriggers`.
-8. Add assignees in the `Assignees` tab.
-9. Create tickets in the `Tickets` tab or use `MVFT Tracker > Task > Add task`.
+8. Add members in the `Members` tab.
+9. Create tasks in the `Tasks` tab or use `MVFT Tracker > Task > Add task`.
 
-When a row has a ticket title and assignee email, the assigned person receives an email.
+When a row has a task title and assignee email, the assigned person receives an email. Selecting a known member as assignee fills `Assignee Email`.
 
-When an existing ticket changes, the person in `Created By Email` receives an update email with the changed fields.
+When an existing task changes, the person in `Created By Email` receives an update email with the changed fields.
 
-The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. The script looks up the matching name in `Assignees`; if no member matches, it derives a readable name from the email address.
+The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. The script looks up the matching name in `Members`; if no member matches, it derives a readable name from the email address.
+
+If Google does not provide the current user and the creator is not in `Members`, choose `Enter manually` in the creator dropdown.
+
+`Notes` sits after `Due Date`. The columns after `Notes` are notification metadata used by the script.
+
+Date columns are formatted in the sheet as `mm-dd-yy`.
 
 ## Google Sheets Menu
 

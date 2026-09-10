@@ -70,11 +70,11 @@ installTriggers
 
 Click `Run`.
 
-This installs an edit trigger so emails can be sent when new tickets are created or reassigned.
+This installs an edit trigger so emails can be sent when new tasks are created or reassigned.
 
 ## 6. Add Members
 
-Return to the Google Sheet and open the `Assignees` tab.
+Return to the Google Sheet and open the `Members` tab.
 
 Add names and email addresses:
 
@@ -90,18 +90,16 @@ You can also use:
 MVFT Tracker > Member > Add member
 ```
 
-## 7. Create Tickets
+## 7. Create Tasks
 
-Open the `Tickets` tab and add a new row with at least:
+Open the `Tasks` tab and add a new row with at least:
 
 ```text
 Title
-Assignee Email
-Created By
-Created By Email
+Assignee or Assignee Email
 ```
 
-The script will fill in ticket metadata and send the assignment notification email. If `Created By` and `Created By Email` are blank on a direct sheet edit, the edit trigger fills them from the editor's Google email when Google makes that email available.
+The script will fill in task metadata and send the assignment notification email. If you select an assignee from `Members`, the script fills `Assignee Email`. If `Created By` and `Created By Email` are blank on a direct sheet edit, the edit trigger fills them from the editor's Google email when Google makes that email available.
 
 You can also use:
 
@@ -109,11 +107,13 @@ You can also use:
 MVFT Tracker > Task > Add task
 ```
 
-The menu version opens one form dialog for the creator, task details, assignee, due date, and notes. The `Created by` dropdown is preselected with the current Google user when possible. The name comes from the `Assignees` tab when the email matches a member; otherwise, the script derives a readable name from the email address.
+The menu version opens one form dialog for the creator, task details, assignee, due date, and notes. The `Created by` dropdown is preselected with the current Google user when possible. The name comes from the `Members` tab when the email matches a member; otherwise, the script derives a readable name from the email address. If Google does not provide the user and the creator is not in `Members`, choose `Enter manually`.
 
-## Update Tickets
+Dates display in the sheet as `mm-dd-yy`.
 
-To update an existing ticket through the menu, select any cell in the ticket row and use:
+## Update Tasks
+
+To update an existing task through the menu, select any cell in the task row and use:
 
 ```text
 MVFT Tracker > Task > Update selected task
@@ -125,13 +125,13 @@ If editing directly in the sheet and Google does not expose the editor email, ma
 
 ## Manual Notification Run
 
-If a ticket was added before the trigger was installed, use:
+If a task was added before the trigger was installed, use:
 
 ```text
 MVFT Tracker > Task > Send pending assignments
 ```
 
-This sends assignment emails for tickets that have not yet notified their current assignee.
+This sends assignment emails for tasks that have not yet notified their current assignee.
 
 ## Reassignment Behavior
 
@@ -140,6 +140,8 @@ If the assignee email changes, the script sends a new notification to the new em
 ## Troubleshooting
 
 If saving a task says a title or other field violates a priority/status validation rule, paste the latest `Code.gs`, save the Apps Script project, and run `setupTracker` once. This clears old validations from earlier tracker versions and reapplies them to the current columns.
+
+If your sheet still has the old `Tickets` or `Assignees` tabs, run `setupTracker` once after updating the script. It renames them to `Tasks` and `Members`, changes `Ticket ID` to `Task ID`, and moves `Notes` after `Due Date`.
 
 ## Settings
 
