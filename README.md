@@ -56,9 +56,7 @@ When a row has a task title and assignee email, the assigned person receives an 
 
 When an existing task changes, the person in `Created By Email` receives an update email with the changed fields.
 
-The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. The script looks up the matching name in `Members`; if no member matches, it derives a readable name from the email address.
-
-If Google does not provide the current user and the creator is not in `Members`, choose `Enter manually` in the creator dropdown.
+The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. If Google does not provide the current user, the dropdown starts with the first available member and still lets you choose another existing member.
 
 `Notes` sits after `Due Date`. The columns after `Notes` are notification metadata used by the script.
 

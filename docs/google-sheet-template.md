@@ -18,7 +18,7 @@ Task ID	Created At	Updated At	Created By	Created By Email	Title	Description	Prio
 
 `Created By` should be the requester or creator name. `Created By Email` is used for update notifications when the task changes.
 
-When adding a task from the menu, the `Created by` dropdown is preselected from the current Google user when Apps Script can read the user's email. If Google does not provide the user and the creator is not in `Members`, choose `Enter manually`. When a task is created by typing directly into the sheet, blank creator fields are filled from the editor email when Google makes it available.
+When adding a task from the menu, the `Created by` dropdown is preselected from the current Google user when Apps Script can read the user's email. If Google does not provide the current user, the dropdown starts with the first available member and still lets you choose another existing member. When a task is created by typing directly into the sheet, blank creator fields are filled from the editor email when Google makes it available.
 
 Use names from `Members` for `Created By` and `Assignee` when possible. The script fills the matching email fields from the member list.
 

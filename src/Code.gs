@@ -817,10 +817,7 @@ function serializeTicketForDialog_(ticket) {
 
 function normalizeTaskForm_(form, assigneesSheet, currentUser) {
   const creator = currentUser || { name: '', email: '' };
-  const formCreatedBy =
-    String(form.createdBy || '').trim() === '__custom__'
-      ? String(form.createdByCustom || '').trim()
-      : String(form.createdBy || '').trim();
+  const formCreatedBy = String(form.createdBy || '').trim();
   const formCreatedByEmail = String(form.createdByEmail || '').trim();
   const useCurrentUser = !formCreatedBy && !formCreatedByEmail;
   const createdBy = hydrateMemberFromForm_(

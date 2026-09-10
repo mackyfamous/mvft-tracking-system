@@ -28,9 +28,14 @@
       }
 
       label {
-        display: grid;
-        gap: 6px;
+        display: block;
         font-weight: 700;
+      }
+
+      label input,
+      label select,
+      label textarea {
+        margin-top: 6px;
       }
 
       input,
@@ -83,6 +88,10 @@
       .status.error {
         color: #b3261e;
       }
+
+      .required-star {
+        color: #ea4335;
+      }
     </style>
   </head>
   <body>
@@ -93,17 +102,17 @@
       <input type="hidden" name="rowNumber">
 
       <label>
-        Name
+        Name <span class="required-star">*</span>
         <input name="name" required>
       </label>
 
       <label>
-        Email
+        Email <span class="required-star">*</span>
         <input name="email" type="email" required>
       </label>
 
       <label>
-        Active
+        Active <span class="required-star">*</span>
         <select name="active" required></select>
       </label>
 

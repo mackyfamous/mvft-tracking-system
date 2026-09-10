@@ -34,9 +34,14 @@
       }
 
       label {
-        display: grid;
-        gap: 6px;
+        display: block;
         font-weight: 700;
+      }
+
+      label input,
+      label select,
+      label textarea {
+        margin-top: 6px;
       }
 
       input,
@@ -63,10 +68,6 @@
         border-radius: 6px;
         background: #f8fafd;
         font-weight: 700;
-      }
-
-      .hidden {
-        display: none;
       }
 
       .actions {
@@ -108,6 +109,10 @@
       .status.error {
         color: #b3261e;
       }
+
+      .required-star {
+        color: #ea4335;
+      }
     </style>
   </head>
   <body>
@@ -118,61 +123,58 @@
       <input type="hidden" name="mode">
       <input type="hidden" name="rowNumber">
 
+      <datalist id="members"></datalist>
+
       <div class="grid">
         <label>
-          Created by
+          Created by <span class="required-star">*</span>
           <select name="createdBy" required></select>
         </label>
         <label>
-          Created by email
+          Created by email <span class="required-star">*</span>
           <input name="createdByEmail" type="email" required>
         </label>
       </div>
 
-      <label class="hidden" id="created-by-custom-label">
-        Created by name
-        <input name="createdByCustom" autocomplete="off">
-      </label>
-
       <label>
-        Task title
+        Task title <span class="required-star">*</span>
         <input name="title" required>
       </label>
 
       <label>
-        Description
+        Description (Optional)
         <textarea name="description"></textarea>
       </label>
 
       <div class="grid">
         <label>
-          Priority
+          Priority <span class="required-star">*</span>
           <select name="priority" required></select>
         </label>
         <label>
-          Status
+          Status <span class="required-star">*</span>
           <select name="status" required></select>
         </label>
       </div>
 
       <div class="grid">
         <label>
-          Assignee
-          <select name="assignee"></select>
+          Assignee <span class="required-star">*</span>
+          <input name="assignee" list="members" autocomplete="off" required>
         </label>
         <label>
-          Assignee email
+          Assignee email <span class="required-star">*</span>
           <input name="assigneeEmail" type="email" required>
         </label>
       </div>
 
       <label>
-        Due date
-        <input name="dueDate" type="date">
+        Due date <span class="required-star">*</span>
+        <input name="dueDate" type="date" required>
       </label>
 
       <label>
-        Notes
+        Notes (Optional)
         <textarea name="notes"></textarea>
       </label>
 
@@ -219,7 +221,8 @@
       }
 
       function findMemberByName(name) {
-        return members.find((member) => normalize(member.name) === normalize(name));
+        const val = String(name || '').trim();
+        return members.find((member) => normalize(member.name) === normalize(val));
       }
 
       function setField(name, value) {
@@ -240,14 +243,22 @@
         });
       }
 
-      function fillMemberSelect(name, selectedName, selectedEmail, placeholderText, isRequired, allowCustom) {
+      function fillMemberSelect(name, selectedName, selectedEmail) {
         const select = document.querySelector(`[name="${name}"]`);
-        const hasSelection = Boolean(normalize(selectedName) || normalize(selectedEmail));
+
+        let effName = selectedName;
+        let effEmail = selectedEmail;
+
+        if (!normalize(effName) && !normalize(effEmail) && members.length > 0) {
+          effName = members[0].name;
+          effEmail = members[0].email;
+        }
+
         const options = mergeMembers(
           [
             {
-              name: selectedName,
-              email: selectedEmail,
+              name: effName,
+              email: effEmail,
             },
             ...members,
           ],
@@ -256,52 +267,47 @@
 
         select.innerHTML = '';
 
-        if (!hasSelection) {
-          const placeholder = document.createElement('option');
-          placeholder.value = '';
-          placeholder.textContent = placeholderText;
-          placeholder.disabled = Boolean(isRequired);
-          placeholder.selected = true;
-          select.appendChild(placeholder);
-        }
-
         if (options.length === 0) {
           return;
         }
 
-        options.forEach((member) => {
+        options.forEach((member, index) => {
           const option = document.createElement('option');
           option.value = member.name;
           option.textContent = member.email ? `${member.name} (${member.email})` : member.name;
           option.dataset.email = member.email || '';
           if (
-            (selectedName && normalize(member.name) === normalize(selectedName)) ||
-            (selectedEmail && normalize(member.email) === normalize(selectedEmail))
+            index === 0 ||
+            (effName && normalize(member.name) === normalize(effName)) ||
+            (effEmail && normalize(member.email) === normalize(effEmail))
           ) {
             option.selected = true;
           }
           select.appendChild(option);
         });
 
-        if (allowCustom) {
-          const customOption = document.createElement('option');
-          customOption.value = '__custom__';
-          customOption.textContent = 'Enter manually';
-          select.appendChild(customOption);
-        }
+        hydrateEmail(name, name === 'createdBy' ? 'createdByEmail' : 'assigneeEmail');
+      }
+
+      function fillMembers() {
+        const datalist = document.getElementById('members');
+        datalist.innerHTML = '';
+        members.forEach((member) => {
+          const option = document.createElement('option');
+          option.value = member.name;
+          option.label = member.email;
+          datalist.appendChild(option);
+        });
       }
 
       function hydrateEmail(nameField, emailField) {
         const nameInput = document.querySelector(`[name="${nameField}"]`);
         const emailInput = document.querySelector(`[name="${emailField}"]`);
+
         if (nameInput.tagName === 'SELECT') {
           const selectedOption = nameInput.options[nameInput.selectedIndex];
-          if (selectedOption) {
-            if (selectedOption.value === '__custom__') {
-              emailInput.value = '';
-              return;
-            }
-            emailInput.value = selectedOption.value ? selectedOption.dataset.email || '' : '';
+          if (selectedOption && selectedOption.dataset.email) {
+            emailInput.value = selectedOption.dataset.email;
             return;
           }
         }
@@ -309,6 +315,8 @@
         const member = findMemberByName(nameInput.value);
         if (member && member.email) {
           emailInput.value = member.email;
+        } else {
+          emailInput.value = '';
         }
       }
 
@@ -318,26 +326,6 @@
           data[key] = value;
         });
         return data;
-      }
-
-      function normalizeCustomCreator(data) {
-        if (data.createdBy === '__custom__') {
-          data.createdBy = data.createdByCustom || '';
-        }
-        delete data.createdByCustom;
-        return data;
-      }
-
-      function toggleCustomCreator() {
-        const select = document.querySelector('[name="createdBy"]');
-        const customLabel = document.getElementById('created-by-custom-label');
-        const customInput = document.querySelector('[name="createdByCustom"]');
-        const isCustom = select.value === '__custom__';
-        customLabel.className = isCustom ? '' : 'hidden';
-        customInput.required = isCustom;
-        if (!isCustom) {
-          customInput.value = '';
-        }
       }
 
       function setBusy(isBusy) {
@@ -365,11 +353,11 @@
             setBusy(false);
             setStatus(error.message || 'Unable to save task.', true);
           })
-          .submitTaskForm(normalizeCustomCreator(collectForm()));
+          .submitTaskForm(collectForm());
       }
 
       function initialize() {
-        const task = DATA.task || DATA.ticket || {};
+        const task = DATA.task || {};
         const isAdd = DATA.mode === 'add';
         document.getElementById('title').textContent = isAdd ? 'Add task' : 'Update task';
         document.querySelector('[name="mode"]').value = DATA.mode || 'add';
@@ -377,33 +365,36 @@
 
         if (!isAdd) {
           const meta = document.getElementById('task-meta');
-          meta.textContent = `Editing ${task.taskId || task.ticketId || `row ${DATA.rowNumber}`}`;
+          meta.textContent = `Editing ${task.taskId || `row ${DATA.rowNumber}`}`;
           meta.style.display = 'block';
         }
 
-        fillMemberSelect('createdBy', task.createdBy, task.createdByEmail, 'Select creator', true, true);
-        fillMemberSelect('assignee', task.assignee, task.assigneeEmail, 'Select assignee', false, false);
+        fillMembers();
+        fillMemberSelect('createdBy', task.createdBy, task.createdByEmail);
         fillSelect('priority', DATA.priorities || [], task.priority);
         fillSelect('status', DATA.statuses || [], task.status);
 
         setField('createdByEmail', task.createdByEmail);
         setField('title', task.title);
         setField('description', task.description);
+        setField('assignee', task.assignee);
         setField('assigneeEmail', task.assigneeEmail);
         setField('dueDate', task.dueDate);
         setField('notes', task.notes);
 
         document.querySelector('[name="createdBy"]').addEventListener('change', () => {
-          toggleCustomCreator();
           hydrateEmail('createdBy', 'createdByEmail');
         });
-        toggleCustomCreator();
         hydrateEmail('createdBy', 'createdByEmail');
 
-        document.querySelector('[name="assignee"]').addEventListener('change', () => {
+        const assigneeInput = document.querySelector('[name="assignee"]');
+        assigneeInput.addEventListener('input', () => {
           hydrateEmail('assignee', 'assigneeEmail');
         });
-        hydrateEmail('assignee', 'assigneeEmail');
+        assigneeInput.addEventListener('change', () => {
+          hydrateEmail('assignee', 'assigneeEmail');
+        });
+
         document.getElementById('task-form').addEventListener('submit', submitTask);
         document.getElementById('cancel').addEventListener('click', () => google.script.host.close());
       }
