@@ -62,7 +62,7 @@ If Google does not provide the current user and the creator is not in `Members`,
 
 `Notes` sits after `Due Date`. The columns after `Notes` are notification metadata used by the script.
 
-Date columns are formatted in the sheet as `mm-dd-yy`.
+Date columns are formatted in the sheet as `yyyy-MM-dd`.
 
 ## Google Sheets Menu
 

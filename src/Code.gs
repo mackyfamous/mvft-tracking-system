@@ -1271,14 +1271,14 @@ function applyValidations_(ticketsSheet, assigneesSheet) {
 
 function formatTicketsSheet_(sheet) {
   sheet.getRange(1, 1, 1, TASK_HEADERS.length).setFontWeight('bold').setBackground('#e8f0fe');
-  sheet.getRange(2, COL.CREATED_AT, Math.max(sheet.getMaxRows() - 1, 1), 2).setNumberFormat('mm-dd-yy hh:mm');
-  sheet.getRange(2, COL.DUE_DATE, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat('mm-dd-yy');
+  sheet.getRange(2, COL.CREATED_AT, Math.max(sheet.getMaxRows() - 1, 1), 2).setNumberFormat('yyyy-mm-dd hh:mm');
+  sheet.getRange(2, COL.DUE_DATE, Math.max(sheet.getMaxRows() - 1, 1), 1).setNumberFormat('yyyy-mm-dd');
   sheet
     .getRange(2, COL.ASSIGNMENT_NOTIFIED_AT, Math.max(sheet.getMaxRows() - 1, 1), 1)
-    .setNumberFormat('mm-dd-yy hh:mm');
+    .setNumberFormat('yyyy-mm-dd hh:mm');
   sheet
     .getRange(2, COL.UPDATE_NOTIFIED_AT, Math.max(sheet.getMaxRows() - 1, 1), 1)
-    .setNumberFormat('mm-dd-yy hh:mm');
+    .setNumberFormat('yyyy-mm-dd hh:mm');
 
   const widths = [110, 145, 145, 160, 220, 220, 320, 110, 130, 160, 220, 120, 300, 210, 220, 145, 190, 145];
   widths.forEach((width, index) => sheet.setColumnWidth(index + 1, width));
@@ -1376,7 +1376,7 @@ function findSettingRow_(settingsSheet, key) {
 
 function formatDateForEmail_(value) {
   if (Object.prototype.toString.call(value) === '[object Date]' && !Number.isNaN(value.getTime())) {
-    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'MM-dd-yy');
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
 
   return String(value || 'Not set');

@@ -109,7 +109,7 @@ MVFT Tracker > Task > Add task
 
 The menu version opens one form dialog for the creator, task details, assignee, due date, and notes. The `Created by` dropdown is preselected with the current Google user when possible. The name comes from the `Members` tab when the email matches a member; otherwise, the script derives a readable name from the email address. If Google does not provide the user and the creator is not in `Members`, choose `Enter manually`.
 
-Dates display in the sheet as `mm-dd-yy`.
+Dates display in the sheet as `yyyy-MM-dd`.
 
 ## Update Tasks
 

@@ -24,7 +24,7 @@ Use names from `Members` for `Created By` and `Assignee` when possible. The scri
 
 `Notes` is the last normal task-entry field. The columns after `Notes` are notification metadata used by the script.
 
-Date columns display as `mm-dd-yy` and remain real date values for sorting/filtering.
+Date columns display as `yyyy-MM-dd` and remain real date values for sorting/filtering.
 
 Recommended dropdown values:
 
