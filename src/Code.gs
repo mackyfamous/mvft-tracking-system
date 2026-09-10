@@ -180,8 +180,13 @@ function handleTaskEdit(e) {
       const previousTicket = getStoredTicketSnapshotForRow_(sheet, row);
       normalizeTicketRow_(sheet, row, editorEmail);
       maybeHydrateMemberEmails_(sheet, row);
-      maybeSendAssignmentEmail_(sheet, row);
       const currentTicket = mapTicketRow_(getTicketRow_(sheet, row));
+
+      if (!isTaskReadyForNotifications_(currentTicket)) {
+        continue;
+      }
+
+      maybeSendAssignmentEmail_(sheet, row);
       maybeSendCreatorUpdateEmail_(sheet, row, previousTicket, currentTicket, editorEmail);
       saveTicketSnapshot_(currentTicket);
     }
@@ -210,7 +215,11 @@ function sendPendingAssignmentNotifications() {
       if (maybeSendAssignmentEmail_(sheet, row)) {
         sentCount += 1;
       }
-      saveTicketSnapshot_(mapTicketRow_(getTicketRow_(sheet, row)));
+
+      const currentTicket = mapTicketRow_(getTicketRow_(sheet, row));
+      if (isTaskReadyForNotifications_(currentTicket)) {
+        saveTicketSnapshot_(currentTicket);
+      }
     }
   } finally {
     lock.releaseLock();
@@ -489,6 +498,10 @@ function maybeSendAssignmentEmail_(sheet, rowNumber) {
   const row = getTicketRow_(sheet, rowNumber);
   const ticket = mapTicketRow_(row);
 
+  if (!isTaskReadyForNotifications_(ticket)) {
+    return false;
+  }
+
   if (!ticket.title) {
     return false;
   }
@@ -586,6 +599,10 @@ function buildAssignmentEmail_(ticket) {
 
 function maybeSendCreatorUpdateEmail_(sheet, rowNumber, previousTicket, currentTicket, editorEmail) {
   if (!previousTicket || !isSettingEnabled_('Enable Creator Update Emails', true)) {
+    return false;
+  }
+
+  if (!isTaskReadyForNotifications_(previousTicket) || !isTaskReadyForNotifications_(currentTicket)) {
     return false;
   }
 
@@ -748,14 +765,47 @@ function isBlankTicketRow_(row) {
     row[COL.CREATED_BY - 1],
     row[COL.CREATED_BY_EMAIL - 1],
     row[COL.TITLE - 1],
-    row[COL.DESCRIPTION - 1],
     row[COL.ASSIGNEE - 1],
     row[COL.ASSIGNEE_EMAIL - 1],
     row[COL.DUE_DATE - 1],
-    row[COL.NOTES - 1],
   ];
 
   return importantValues.every((value) => String(value || '').trim() === '');
+}
+
+function isTaskReadyForNotifications_(ticket) {
+  if (!ticket) {
+    return false;
+  }
+
+  return Boolean(
+    String(ticket.createdBy || '').trim() &&
+      isValidEmail_(ticket.createdByEmail) &&
+      String(ticket.title || '').trim() &&
+      isKnownPriority_(ticket.priority) &&
+      isKnownStatus_(ticket.status) &&
+      String(ticket.assignee || '').trim() &&
+      isValidEmail_(ticket.assigneeEmail) &&
+      hasValidTaskDate_(ticket.dueDate)
+  );
+}
+
+function isKnownPriority_(priority) {
+  const normalizedPriority = normalizeLookupValue_(priority);
+  return CONFIG.priorities.some((option) => normalizeLookupValue_(option) === normalizedPriority);
+}
+
+function isKnownStatus_(status) {
+  const normalizedStatus = normalizeLookupValue_(status);
+  return CONFIG.statuses.some((option) => normalizeLookupValue_(option) === normalizedStatus);
+}
+
+function hasValidTaskDate_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !Number.isNaN(value.getTime())) {
+    return true;
+  }
+
+  return Boolean(parseDateInput_(value));
 }
 
 function isClosedStatus_(status) {
@@ -835,7 +885,7 @@ function normalizeTaskForm_(form, assigneesSheet, currentUser) {
   const assignee = hydrateMemberFromForm_(assigneesSheet, form.assignee, form.assigneeEmail, {
     nameLabel: 'Assignee',
     emailLabel: 'Assignee email',
-    requireName: false,
+    requireName: true,
     requireEmail: true,
   });
   const dueDateText = String(form.dueDate || '').trim();
@@ -849,7 +899,7 @@ function normalizeTaskForm_(form, assigneesSheet, currentUser) {
     status: requireChoice_(form.status, CONFIG.statuses, 'Status'),
     assignee: assignee.name,
     assigneeEmail: assignee.email,
-    dueDate: dueDateText ? requireDate_(dueDateText, 'Due date') : '',
+    dueDate: requireDate_(dueDateText, 'Due date'),
     notes: String(form.notes || '').trim(),
   };
 }
@@ -1043,7 +1093,7 @@ function syncTicketSnapshots_(ticketsSheet) {
 
   for (let row = 2; row <= lastRow; row += 1) {
     const ticket = mapTicketRow_(getTicketRow_(ticketsSheet, row));
-    if (ticket.taskId && !isBlankTicketRow_(getTicketRow_(ticketsSheet, row))) {
+    if (ticket.taskId && isTaskReadyForNotifications_(ticket)) {
       saveTicketSnapshot_(ticket);
     }
   }

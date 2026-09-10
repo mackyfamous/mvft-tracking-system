@@ -96,10 +96,14 @@ Open the `Tasks` tab and add a new row with at least:
 
 ```text
 Title
-Assignee or Assignee Email
+Assignee
+Assignee Email
+Due Date
 ```
 
-The script will fill in task metadata and send the assignment notification email. If you select an assignee from `Members`, the script fills `Assignee Email`. If `Created By` and `Created By Email` are blank on a direct sheet edit, the edit trigger fills them from the editor's Google email when Google makes that email available.
+The script will fill in task metadata and send the assignment notification email after the required task fields are complete. If you select an assignee from `Members`, the script fills `Assignee Email`. If `Created By` and `Created By Email` are blank on a direct sheet edit, the edit trigger fills them from the editor's Google email when Google makes that email available.
+
+For direct sheet entry, notifications wait until `Created By`, `Created By Email`, `Title`, `Priority`, `Status`, `Assignee`, `Assignee Email`, and `Due Date` are filled. `Description` and `Notes` are optional.
 
 You can also use:
 

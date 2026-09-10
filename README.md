@@ -52,9 +52,11 @@ If an older sheet has `Tickets` or `Assignees`, running `setupTracker` renames t
 8. Add members in the `Members` tab.
 9. Create tasks in the `Tasks` tab or use `MVFT Tracker > Task > Add task`.
 
-When a row has a task title and assignee email, the assigned person receives an email. Selecting a known member as assignee fills `Assignee Email`.
+When a manually edited row has the required task fields filled, the assigned person receives an email. Selecting a known member as assignee fills `Assignee Email`.
 
 When an existing task changes, the person in `Created By Email` receives an update email with the changed fields.
+
+For direct sheet entry, notifications wait until `Created By`, `Created By Email`, `Title`, `Priority`, `Status`, `Assignee`, `Assignee Email`, and `Due Date` are filled. `Description` and `Notes` are optional. Script metadata columns do not count toward task readiness.
 
 The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. If Google does not provide the current user, the dropdown starts with the first available member and still lets you choose another existing member.
 

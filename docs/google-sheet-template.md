@@ -22,6 +22,8 @@ When adding a task from the menu, the `Created by` dropdown is preselected from 
 
 Use names from `Members` for `Created By` and `Assignee` when possible. The script fills the matching email fields from the member list.
 
+For direct sheet entry, notifications wait until `Created By`, `Created By Email`, `Title`, `Priority`, `Status`, `Assignee`, `Assignee Email`, and `Due Date` are filled. `Description` and `Notes` are optional. Script metadata columns do not count toward task readiness.
+
 `Notes` is the last normal task-entry field. The columns after `Notes` are notification metadata used by the script.
 
 Date columns display as `yyyy-MM-dd` and remain real date values for sorting/filtering.
