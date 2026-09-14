@@ -115,6 +115,8 @@ The menu version opens one form dialog for the creator, task details, assignee, 
 
 Dates display in the sheet as `yyyy-MM-dd`.
 
+The notification metadata columns after `Notes` are hidden by setup. The script still uses them for email tracking.
+
 ## Update Tasks
 
 To update an existing task through the menu, select any cell in the task row and use:

@@ -66,6 +66,9 @@ const TASK_HEADER_ALIASES = {
   'Notified At': 'Assignment Notified At',
 };
 
+const TASK_METADATA_START_COL = COL.ASSIGNMENT_NOTIFICATION_STATUS;
+const TASK_METADATA_COLUMN_COUNT = TASK_HEADERS.length - TASK_METADATA_START_COL + 1;
+
 const DEFAULT_SETTINGS = [
   ['Tracker Name', CONFIG.trackerName],
   ['Notification Prefix', CONFIG.notificationPrefix],
@@ -1353,6 +1356,7 @@ function formatTicketsSheet_(sheet) {
 
   const widths = [110, 145, 145, 160, 220, 220, 320, 110, 130, 160, 220, 120, 300, 210, 220, 145, 190, 145];
   widths.forEach((width, index) => sheet.setColumnWidth(index + 1, width));
+  sheet.hideColumns(TASK_METADATA_START_COL, TASK_METADATA_COLUMN_COUNT);
 
   ensureFilter_(sheet);
 }

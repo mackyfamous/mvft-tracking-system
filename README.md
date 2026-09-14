@@ -18,8 +18,10 @@ Google Sheets task tracker with Apps Script email notifications.
 ```text
 mvft-tracking-system/
 ├── docs/
+│   ├── assets/
 │   ├── google-sheet-template.md
-│   └── setup.md
+│   ├── setup.md
+│   └── user-manual.md
 ├── src/
 │   ├── Code.gs
 │   ├── MemberDialog.html
@@ -60,7 +62,7 @@ For direct sheet entry, notifications wait until `Created By`, `Created By Email
 
 The task form preselects the current Google user in the `Created By` dropdown when Apps Script can read the user's email. If Google does not provide the current user, the dropdown starts with the first available member and still lets you choose another existing member.
 
-`Notes` sits after `Due Date`. The columns after `Notes` are notification metadata used by the script.
+`Notes` sits after `Due Date`. The columns after `Notes` are notification metadata used by the script and are hidden by setup.
 
 Date columns are formatted in the sheet as `yyyy-MM-dd`.
 
@@ -81,3 +83,7 @@ Google requires the account that owns/runs the Apps Script to authorize email se
 The sender will be the Google account that authorized the script.
 
 Google may hide the editor email for some consumer accounts, shared files, or domain settings. In that case, the form still requires the creator name and email before saving.
+
+## User Manual
+
+See `docs/user-manual.md` for the screenshot-based staff/admin guide covering setup, roles, task creation, direct sheet entry, notifications, statuses, and dashboard suggestions.
